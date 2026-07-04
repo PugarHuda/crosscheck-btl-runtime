@@ -386,6 +386,12 @@ class TestLiveGateway(unittest.TestCase):
             "Order: 3 cartons, 12 bottles per carton.", ["total_bottles"]))
         self.assertEqual(cc.norm(r["fields"]["total_bottles"]["value"]), "36")
 
+    def test_cache_demo_hits(self):
+        d = self._live(lambda: cc.cache_demo())
+        self.assertGreater(d["cold"]["ms"], 0)
+        self.assertGreaterEqual(d["warm"]["saved"], 0)
+        self.assertTrue(d["cache_hit"])  # 2nd identical call is cheaper or faster
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

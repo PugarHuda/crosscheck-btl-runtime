@@ -26,6 +26,7 @@ of the BTL runtime.
 - `POST /v1/chat/completions` — extraction (×2 providers) + judge, via `gpt-4.1-mini` (OpenAI route) and `gemma-3-4b-it` (OpenRouter route) — two different providers behind one gateway
 - `GET /v1/models` — verify available model ids
 - **Savings headers** — `x-btl-customer-charge` / `x-btl-saved` / `x-btl-cache-tier` read off each response to show real per-run cost and cache savings
+- **Exact-cache demo** — the dashboard's "⚡ Demo exact cache" fires the same prompt twice; the second call is a cache hit (measured ~1.5–2.4× faster, `x-btl-saved` > 0) — a live proof of a BTL-flagship feature
 
 ## Run
 ```bash
@@ -42,7 +43,8 @@ python crosscheck.py models     # confirm exact model ids, override with BTL_MOD
 python server.py                # -> http://localhost:8000
 
 # CLI extras
-python crosscheck.py bench                              # accuracy numbers over the labeled set
+python crosscheck.py bench                              # accuracy + real cost over the labeled set
+python crosscheck.py cache                              # prove the exact cache: same prompt twice, faster+cheaper 2nd call
 python crosscheck.py extract "INVOICE Acme ... TOTAL $99" vendor total
 ```
 

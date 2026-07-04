@@ -60,10 +60,12 @@ button.alt{background:#21262d;border:1px solid #30363d}
 <div class=row>
   <button onclick=run()>Run Crosscheck</button>
   <button class=alt onclick=bench()>Run Benchmark</button>
+  <button class=alt onclick=cacheDemo()>⚡ Demo exact cache</button>
   <span id=status class=mini></span>
 </div>
 <div id=out></div>
 <div id=benchout></div>
+<div id=cacheout></div>
 <script>
 let SAMPLES=[];
 fetch('/api/samples').then(r=>r.json()).then(d=>{SAMPLES=d;
@@ -101,6 +103,22 @@ function render(d){
   document.getElementById('out').innerHTML=h;
 }
 function fmt(v){return v==null?'<i>null</i>':String(v);}
+function cacheDemo(){
+  document.getElementById('status').textContent='firing the same prompt twice…';
+  document.getElementById('cacheout').innerHTML='';
+  fetch('/api/cache-demo').then(r=>r.json()).then(d=>{
+    document.getElementById('status').textContent='';
+    if(d.error){document.getElementById('cacheout').innerHTML=`<div class="banner warn">${d.error}</div>`;return;}
+    document.getElementById('cacheout').innerHTML=`
+    <div class=grid>
+      <div class=stat><b>${d.cold.ms}ms</b><span>1st call · cold (miss)</span></div>
+      <div class="stat hl"><b>${d.warm.ms}ms</b><span>2nd call · ${d.cache_hit?'cache HIT ⚡':'warm'}</span></div>
+      <div class=stat><b>${d.speedup}×</b><span>faster on hit</span></div>
+      <div class=stat><b>$${d.warm.saved.toFixed(6)}</b><span>saved by exact cache</span></div>
+    </div>
+    <p class=mini>Same prompt, twice, through the gateway (${d.model}). The 2nd call is served from BTL's exact-response cache — faster and cheaper. Real x-btl-saved header, not simulated.</p>`;
+  }).catch(e=>document.getElementById('status').textContent='error: '+e);
+}
 function bench(){
   document.getElementById('status').textContent='benchmarking (this hits the API many times)…';
   document.getElementById('benchout').innerHTML='';
@@ -155,6 +173,11 @@ class H(http.server.BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(out))
             except (OSError, ValueError) as e:
                 return self._send(500, json.dumps({"error": f"samples.json: {e}"}))
+        if self.path == "/api/cache-demo":
+            try:
+                return self._send(200, json.dumps(cc.cache_demo()))
+            except Exception as e:
+                return self._send(200, json.dumps({"error": str(e)}))
         if self.path == "/api/benchmark":
             try:
                 with open(os.path.join(HERE, "samples.json"), encoding="utf-8") as f:

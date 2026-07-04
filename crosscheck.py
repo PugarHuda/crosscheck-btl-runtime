@@ -62,8 +62,10 @@ def _record_cost(headers):
     with _cost_lock:
         _cost["calls"] += 1
         _cost["charge"] += num("x-btl-customer-charge")
-        _cost["saved"] += num("x-btl-saved")
-        if tier and tier not in ("miss", "none", "bypass"):
+        saved = num("x-btl-saved")
+        _cost["saved"] += saved
+        # x-btl-cache-tier isn't always present; a nonzero saved is the reliable hit signal
+        if saved > 0 or (tier and tier not in ("miss", "none", "bypass")):
             _cost["cached"] += 1
 
 
@@ -101,6 +103,43 @@ def _http_chat(model, messages, temperature=0, response_json=True):
         raise GatewayError(599, str(e))
     _record_cost(hdrs)
     return payload["choices"][0]["message"]["content"]
+
+
+def _timed_chat(model, prompt):
+    """One raw call, returning latency + this call's charge/saved headers."""
+    body = json.dumps({"model": model, "temperature": 0,
+                       "messages": [{"role": "user", "content": prompt}]}).encode()
+    req = urllib.request.Request(
+        API_BASE + "/chat/completions", data=body,
+        headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"})
+    t = time.time()
+    with urllib.request.urlopen(req, timeout=60) as r:
+        h = r.headers
+        payload = json.load(r)
+    ms = round((time.time() - t) * 1000)
+
+    def num(k):
+        try:
+            return float(h.get(k) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+    return {"ms": ms, "charge": num("x-btl-customer-charge"),
+            "saved": num("x-btl-saved"),
+            "content": payload["choices"][0]["message"]["content"][:60]}
+
+
+def cache_demo(model=None, nonce=None):
+    """Fire the SAME prompt twice to show the gateway's exact cache: the second
+    call is a cache hit — far faster and cheaper. The nonce guarantees the first
+    call is a cold miss even on re-runs."""
+    model = model or MODEL_A
+    nonce = nonce if nonce is not None else int(time.time())
+    prompt = f"[req {nonce}] Reply with exactly the word CROSSCHECK and nothing else."
+    cold = _timed_chat(model, prompt)
+    warm = _timed_chat(model, prompt)
+    return {"model": model, "cold": cold, "warm": warm,
+            "speedup": round(cold["ms"] / warm["ms"], 1) if warm["ms"] else None,
+            "cache_hit": warm["saved"] > 0 or warm["ms"] < cold["ms"] * 0.6}
 
 
 def chat(model, messages, fallback=None, chat_fn=None, retries=1):
@@ -356,9 +395,11 @@ if __name__ == "__main__":
         m = run_benchmark(samples, progress=lambda i, n: print(f"  {i}/{n}", end="\r"))
         print()
         print(json.dumps({k: v for k, v in m.items() if k != "rows"}, indent=2))
+    elif cmd == "cache":
+        print(json.dumps(cache_demo(), indent=2))
     elif cmd == "extract":
         text = sys.argv[2]
         fields = sys.argv[3:]
         print(json.dumps(crosscheck(text, fields), indent=2))
     else:
-        print("usage: crosscheck.py [demo|models|bench|extract <text> <f1> <f2>...]")
+        print("usage: crosscheck.py [demo|models|bench|cache|extract <text> <f1>...]")
