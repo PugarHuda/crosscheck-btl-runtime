@@ -167,7 +167,8 @@ def crosscheck(text, fields, chat_fn=None):
             out[f] = {"value": j["value"], "agree": False, "needs_review": True,
                       "a": a, "b": b, "reason": j["reason"]}
     return {"fields": out, "servedA": servedA, "servedB": servedB,
-            "degraded": degraded}
+            "degraded": degraded,
+            "failover": servedA != MODEL_A or servedB != MODEL_B}
 
 
 def run_benchmark(samples, chat_fn=None, progress=None):

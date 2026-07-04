@@ -16,8 +16,9 @@ Everything to fill the form and record the 2-minute video. English (demo day is 
 **Which BTL runtime endpoint(s) you used:**
 > POST /v1/chat/completions — extraction across two providers (gpt-4.1-mini on the OpenAI route + gemma-3-4b-it on the OpenRouter route) plus the strong judge pass. GET /v1/models — to confirm available model ids. Multi-provider fan-out, cheap/strong routing, and cross-provider failover are the core of the project.
 
-**Repo:** <your GitHub link>
-**Team name / members:** <fill in>
+**Repo:** https://github.com/PugarHuda/crosscheck-btl-runtime
+**Team name / members:** <fill in — e.g. "Crosscheck · Pugar Huda">
+
 
 ---
 

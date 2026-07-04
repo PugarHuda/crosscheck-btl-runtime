@@ -17,6 +17,10 @@ def validate_extract(req):
     if (not isinstance(fs, list) or not fs
             or not all(isinstance(x, str) and x.strip() for x in fs)):
         return "field 'fields' must be a non-empty list of strings"
+    if len(req["text"]) > 20000:
+        return "field 'text' too long (max 20000 chars)"
+    if len(fs) > 40:
+        return "too many fields (max 40)"
     return None
 
 PORT = int(os.environ.get("PORT", "8000"))
@@ -84,7 +88,7 @@ function render(d){
   let h='';
   if(d.error){document.getElementById('out').innerHTML=`<div class="banner warn">gateway error: ${d.error}</div>`;return;}
   if(d.degraded) h+=`<div class="banner warn">⚠ Degraded: both requests served by <b>${d.servedA}</b> — the other provider failed over. Cross-check disabled, all fields flagged.</div>`;
-  else if(d.servedA!=d.servedB && d.failover) h+=`<div class="banner warn">↺ Failover engaged mid-run.</div>`;
+  else if(d.failover) h+=`<div class="banner warn">↺ Failover: a provider errored, so the request was served by ${d.servedA} + ${d.servedB}.</div>`;
   h+=`<p class=mini>served by ${d.servedA} + ${d.servedB}</p>`;
   for(const f in d.fields){const x=d.fields[f];
     h+=`<div class="card ${x.agree?'ok':'flag'}">
@@ -137,11 +141,14 @@ class H(http.server.BaseHTTPRequestHandler):
         if self.path == "/":
             return self._send(200, PAGE, "text/html; charset=utf-8")
         if self.path == "/api/samples":
-            with open(os.path.join(HERE, "samples.json"), encoding="utf-8") as f:
-                data = json.load(f)
-            out = [{"text": s["text"], "fields": list(s["fields"].keys()),
-                    "preview": s["text"].split("\n")[0][:40]} for s in data]
-            return self._send(200, json.dumps(out))
+            try:
+                with open(os.path.join(HERE, "samples.json"), encoding="utf-8") as f:
+                    data = json.load(f)
+                out = [{"text": s["text"], "fields": list(s["fields"].keys()),
+                        "preview": s["text"].split("\n")[0][:40]} for s in data]
+                return self._send(200, json.dumps(out))
+            except (OSError, ValueError) as e:
+                return self._send(500, json.dumps({"error": f"samples.json: {e}"}))
         if self.path == "/api/benchmark":
             try:
                 with open(os.path.join(HERE, "samples.json"), encoding="utf-8") as f:
@@ -191,5 +198,7 @@ if __name__ == "__main__":
         print("WARNING: BTL_API_KEY not set — API calls will 401.")
     print(f"Crosscheck dashboard: http://localhost:{PORT}  (Ctrl+C to stop)")
     socketserver.ThreadingTCPServer.allow_reuse_address = True
-    with socketserver.ThreadingTCPServer(("", PORT), H) as srv:
+    # bind localhost only: the dashboard makes API calls on your key — don't
+    # expose it to the LAN.
+    with socketserver.ThreadingTCPServer(("127.0.0.1", PORT), H) as srv:
         srv.serve_forever()

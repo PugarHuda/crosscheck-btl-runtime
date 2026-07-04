@@ -8,7 +8,7 @@ Layers:
   - integration: the real HTTP server driven over a socket, gateway mocked
   - live:        real BTL gateway (skipped unless BTL_API_KEY is set)
 """
-import os, re, json, threading, unittest, urllib.request, urllib.error
+import os, re, io, json, http.client, threading, unittest, urllib.request, urllib.error
 from unittest import mock
 import socketserver
 
@@ -73,6 +73,12 @@ class TestValidate(unittest.TestCase):
         self.assertIn("fields", server.validate_extract({"text": "hi", "fields": "a"}))
         self.assertIn("fields", server.validate_extract({"text": "hi", "fields": ["a", ""]}))
 
+    def test_size_caps(self):
+        self.assertIn("too long", server.validate_extract(
+            {"text": "x" * 20001, "fields": ["a"]}))
+        self.assertIn("too many", server.validate_extract(
+            {"text": "hi", "fields": [f"f{i}" for i in range(41)]}))
+
 
 class TestGatewayError(unittest.TestCase):
     def test_retryable(self):
@@ -80,6 +86,48 @@ class TestGatewayError(unittest.TestCase):
         self.assertTrue(cc.GatewayError(599).retryable)
         self.assertFalse(cc.GatewayError(400).retryable)
         self.assertFalse(cc.GatewayError(404).retryable)
+
+
+class TestHttpChat(unittest.TestCase):
+    """_http_chat error mapping — mock urlopen, no network."""
+    class _Resp:
+        def __init__(self, data=None, exc=None):
+            self.data, self.exc = data, exc
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self, *a):
+            if self.exc:
+                raise self.exc
+            return self.data
+
+    def test_success(self):
+        body = b'{"choices": [{"message": {"content": "hi"}}]}'
+        with mock.patch("urllib.request.urlopen", return_value=self._Resp(body)):
+            self.assertEqual(cc._http_chat("m", [{"role": "user", "content": "x"}]), "hi")
+
+    def test_httperror_maps_status(self):
+        err = urllib.error.HTTPError("u", 503, "down", {}, io.BytesIO(b"boom"))
+        with mock.patch("urllib.request.urlopen", side_effect=err):
+            with self.assertRaises(cc.GatewayError) as e:
+                cc._http_chat("m", [{"role": "user", "content": "x"}])
+        self.assertEqual(e.exception.status, 503)
+        self.assertTrue(e.exception.retryable)
+
+    def test_urlerror_is_599(self):
+        with mock.patch("urllib.request.urlopen",
+                        side_effect=urllib.error.URLError("nope")):
+            with self.assertRaises(cc.GatewayError) as e:
+                cc._http_chat("m", [{"role": "user", "content": "x"}])
+        self.assertEqual(e.exception.status, 599)
+
+    def test_incomplete_read_regression(self):
+        # dropped connection mid-read must map to retryable 599, not crash
+        exc = http.client.IncompleteRead(b"", 5)
+        with mock.patch("urllib.request.urlopen", return_value=self._Resp(exc=exc)):
+            with self.assertRaises(cc.GatewayError) as e:
+                cc._http_chat("m", [{"role": "user", "content": "x"}])
+        self.assertEqual(e.exception.status, 599)
+        self.assertTrue(e.exception.retryable)
 
 
 # ==================== UNIT: failover / orchestration =====================
@@ -131,8 +179,14 @@ class TestCrosscheckUnit(unittest.TestCase):
             return '{"x": "1", "y": "2"}'
         r = cc.crosscheck("t", ["x", "y"], chat_fn=f)
         self.assertTrue(r["degraded"])
+        self.assertTrue(r["failover"])
         self.assertEqual(r["servedA"], r["servedB"])
         self.assertTrue(all(r["fields"][k]["needs_review"] for k in ("x", "y")))
+
+    def test_no_failover_flag_when_both_primary(self):
+        r = cc.crosscheck("t", ["v"], chat_fn=lambda m, x: '{"v": "1"}')
+        self.assertFalse(r["failover"])
+        self.assertFalse(r["degraded"])
 
 
 class TestJudge(unittest.TestCase):
