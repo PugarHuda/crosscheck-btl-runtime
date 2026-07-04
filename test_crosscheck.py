@@ -393,6 +393,14 @@ class TestServerIntegration(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertEqual(set(body["fields"]), {"a", "b"})
         self.assertTrue(body["fields"]["a"]["agree"])
+        self.assertIn("cost_usd", body)   # per-request cost + latency attached
+        self.assertIn("ms", body)
+
+    def test_health(self):
+        with mock.patch.object(cc, "list_models", return_value={"data": []}):
+            code, body = self._get("/api/health")
+        self.assertEqual(code, 200)
+        self.assertTrue(json.loads(body)["ok"])
 
     def test_extract_bad_json(self):
         code, body = self._post("/api/extract", b"not json")
