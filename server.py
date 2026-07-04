@@ -131,6 +131,8 @@ fetch('/api/samples').then(r=>r.json()).then(d=>{SAMPLES=d;
     d.map((x,i)=>`<option value=${i}>Sample ${i+1}: ${x.preview}</option>`).join('');
   s.onchange=()=>{const i=+s.value;if(i<0)return;
     $('text').value=SAMPLES[i].text;$('fields').value=SAMPLES[i].fields.join(', ');};
+  if(!$('text').value){const i=d.findIndex(x=>x.text.includes('12 bottles'));
+    if(i>=0){s.value=i;$('text').value=d[i].text;$('fields').value=d[i].fields.join(', ');}}
 });
 try{const p=JSON.parse(localStorage.getItem('cc_last')||'null');if(p){$('text').value=p.text||'';$('fields').value=p.fields||'';}}catch(e){}
 $('fields').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();run();}});

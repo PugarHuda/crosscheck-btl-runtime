@@ -1,6 +1,15 @@
 # Crosscheck — a reliability layer on the BTL runtime
 
+[![tests](https://github.com/PugarHuda/crosscheck-btl-runtime/actions/workflows/test.yml/badge.svg)](https://github.com/PugarHuda/crosscheck-btl-runtime/actions/workflows/test.yml)
+&nbsp;·&nbsp; [MIT](LICENSE) &nbsp;·&nbsp; [Live site](https://crosscheck-btl.vercel.app) &nbsp;·&nbsp; pure Python stdlib &nbsp;·&nbsp; 51 tests
+
 **Live site:** https://crosscheck-btl.vercel.app · source in [`web/index.html`](web/index.html) (deployed to Vercel). The interactive dashboard runs locally via `python server.py`.
+
+```
+                 ┌─ gpt-4.1-mini  (OpenAI route) ──┐   agree     → accept (green)
+   prompt ──▶ ───┤                                 ├─▶ disagree  → strong model judges → flag (red)
+                 └─ gemma-3-4b-it (OpenRouter) ─────┘   5xx/429/drop → fail over to the other
+```
 
 Single LLM calls fail silently: a model returns a confident, wrong value and you
 never know. Crosscheck sends the **same extraction prompt to two providers in
