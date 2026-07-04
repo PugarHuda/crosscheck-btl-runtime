@@ -349,7 +349,13 @@ def snapshot():
     data["captured_at"] = int(time.time())
     data.setdefault("extract", {})
     try:
-        data["cache"] = cache_demo()
+        c = cache_demo()
+        # only store a sample where the cache actually wins on latency — network
+        # noise can make one warm call slower, which would misrepresent the cache
+        if c.get("cache_hit") and (c.get("speedup") or 0) >= 1.3:
+            data["cache"] = c
+        else:
+            print(f"cache sample too weak (speedup {c.get('speedup')}), keeping prior")
     except Exception as e:
         print("cache snapshot failed (keeping prior):", e)
     try:

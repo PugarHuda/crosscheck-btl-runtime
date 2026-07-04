@@ -213,7 +213,8 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._send(200, json.dumps(r))
         except Exception as e:
             snap = SNAP.get("extract", {}).get(req["text"].strip().lower())
-            if snap:
+            # only replay if the snapshot actually covers the fields asked for
+            if snap and all(f in snap.get("fields", {}) for f in req["fields"]):
                 return self._send(200, json.dumps({**snap, "replay": True}))
             return self._send(502, json.dumps({"error": str(e)}))
 

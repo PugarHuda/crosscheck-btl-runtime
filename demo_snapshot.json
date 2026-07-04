@@ -1,22 +1,6 @@
 {
   "captured_at": 1783200338,
-  "cache": {
-    "model": "gpt-4.1-mini",
-    "cold": {
-      "ms": 1073,
-      "charge": 1.8e-05,
-      "saved": 0.0,
-      "content": "CROSSCHECK"
-    },
-    "warm": {
-      "ms": 1309,
-      "charge": 7e-06,
-      "saved": 8e-06,
-      "content": "CROSSCHECK"
-    },
-    "speedup": 0.8,
-    "cache_hit": true
-  },
+  "cache": null,
   "benchmark": null,
   "extract": {
     "order: 3 cartons, 12 bottles per carton.": {

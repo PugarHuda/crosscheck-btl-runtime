@@ -8,7 +8,7 @@ Layers:
   - integration: the real HTTP server driven over a socket, gateway mocked
   - live:        real BTL gateway (skipped unless BTL_API_KEY is set)
 """
-import os, re, io, json, http.client, threading, unittest, urllib.request, urllib.error
+import os, re, io, json, http.client, threading, tempfile, unittest, urllib.request, urllib.error
 from unittest import mock
 import socketserver
 
@@ -301,6 +301,39 @@ class TestBatch(unittest.TestCase):
         self.assertEqual(len(out), 2)          # both recorded, batch didn't crash
         self.assertIn("error", out[0])
         self.assertIn("error", out[1])
+
+
+class TestSnapshot(unittest.TestCase):
+    def test_load_missing_returns_empty(self):
+        old = cc.DEMO_SNAPSHOT
+        cc.DEMO_SNAPSHOT = os.path.join(tempfile.gettempdir(), "does_not_exist_xyz.json")
+        try:
+            self.assertEqual(cc.load_snapshot(), {})
+        finally:
+            cc.DEMO_SNAPSHOT = old
+
+    def test_merge_keeps_prior_when_capture_fails(self):
+        # regression: a failed capture must NOT wipe previously captured pieces
+        fd, path = tempfile.mkstemp(suffix=".json"); os.close(fd)
+        prior = {"cache": {"speedup": 2.0}, "extract": {"k": {"v": 1}},
+                 "benchmark": {"acc_final": 90}}
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(prior, f)
+        old = cc.DEMO_SNAPSHOT
+        cc.DEMO_SNAPSHOT = path
+        try:
+            with mock.patch.object(cc, "cache_demo", side_effect=cc.GatewayError(500)), \
+                 mock.patch.object(cc, "crosscheck", side_effect=cc.GatewayError(500)), \
+                 mock.patch.object(cc, "run_benchmark", side_effect=cc.GatewayError(500)):
+                cc.snapshot()
+            with open(path, encoding="utf-8") as f:
+                after = json.load(f)
+            self.assertEqual(after["cache"]["speedup"], 2.0)
+            self.assertEqual(after["extract"]["k"], {"v": 1})
+            self.assertEqual(after["benchmark"]["acc_final"], 90)
+        finally:
+            cc.DEMO_SNAPSHOT = old
+            os.unlink(path)
 
 
 # ================= INTEGRATION: real HTTP server, mocked gateway =========
