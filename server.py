@@ -99,7 +99,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
       crosscheck.
     </div>
     <div class=toplinks>
-      <span id=health title="checking gateway…"><span class=dot id=dot></span>gateway</span>
+      <span id=health title="checking gateway…" aria-label="gateway status"><span class=dot id=dot aria-hidden=true></span>gateway</span>
       <a href="/">&#8592; landing</a>
       <a href="https://github.com/PugarHuda/crosscheck-btl-runtime">github &#8599;</a>
     </div>
@@ -107,14 +107,14 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
   <div class=pad>
     <h1 class=heroline>Verify every <em>model</em> answer</h1>
     <p class=sub>Cheap model + strong model, same prompt, in parallel through the BTL gateway. Agree = auto-accept. Disagree = the strong model judges it and flags it. A provider 500s or drops the connection &rarr; fail over.</p>
-    <select id=sample></select>
-    <textarea id=text placeholder="Paste messy text&hellip;"></textarea>
-    <input id=fields placeholder="fields, comma separated &mdash; e.g. vendor, invoice_no, total">
+    <select id=sample aria-label="Choose a sample document"></select>
+    <textarea id=text aria-label="Text to extract fields from" placeholder="Paste messy text&hellip;"></textarea>
+    <input id=fields aria-label="Fields to extract, comma separated" placeholder="fields, comma separated &mdash; e.g. vendor, invoice_no, total">
     <div class=row>
       <button id=b-run onclick=run()>Run Crosscheck</button>
       <button class=alt id=b-bench onclick=bench()>Run Benchmark</button>
       <button class=alt id=b-cache onclick=cacheDemo()>&#9889; Demo exact cache</button>
-      <span id=status class=mini></span>
+      <span id=status class=mini role=status aria-live=polite></span>
     </div>
     <div id=out></div>
     <div id=benchout></div>

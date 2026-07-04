@@ -336,6 +336,23 @@ class TestSnapshot(unittest.TestCase):
             os.unlink(path)
 
 
+class TestDeployAssets(unittest.TestCase):
+    """Guard the untested deploy glue: serverless functions must at least compile,
+    and the web assets the deploy assembles from must exist."""
+    ROOT = os.path.dirname(os.path.abspath(__file__))
+
+    def test_serverless_functions_compile(self):
+        import py_compile, glob
+        fns = glob.glob(os.path.join(self.ROOT, "vercel-app", "api", "*.py"))
+        self.assertGreaterEqual(len(fns), 5)
+        for f in fns:
+            py_compile.compile(f, doraise=True)   # raises PyCompileError on syntax error
+
+    def test_web_assets_exist(self):
+        for f in ("web/index.html", "web/404.html", "vercel-app/vercel.json"):
+            self.assertTrue(os.path.exists(os.path.join(self.ROOT, f)), f + " missing")
+
+
 # ================= INTEGRATION: real HTTP server, mocked gateway =========
 class TestServerIntegration(unittest.TestCase):
     @classmethod
