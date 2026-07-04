@@ -59,6 +59,12 @@ class TestParseJson(unittest.TestCase):
         self.assertEqual(cc._parse_json("not json"), {})
         self.assertEqual(cc._parse_json(""), {})
 
+    def test_non_object_coerced(self):
+        # array / scalar responses must not become non-dicts (would crash .get)
+        self.assertEqual(cc._parse_json("[1, 2, 3]"), {})
+        self.assertEqual(cc._parse_json('"just a string"'), {})
+        self.assertEqual(cc._parse_json("42"), {})
+
 
 class TestValidate(unittest.TestCase):
     def test_valid(self):
@@ -84,6 +90,7 @@ class TestGatewayError(unittest.TestCase):
     def test_retryable(self):
         self.assertTrue(cc.GatewayError(500).retryable)
         self.assertTrue(cc.GatewayError(599).retryable)
+        self.assertTrue(cc.GatewayError(429).retryable)   # rate limit -> retry
         self.assertFalse(cc.GatewayError(400).retryable)
         self.assertFalse(cc.GatewayError(404).retryable)
 
@@ -152,6 +159,14 @@ class TestFailover(unittest.TestCase):
             cc.chat("A", [], fallback="B", chat_fn=f)
         self.assertEqual(e.exception.status, 400)
 
+    def test_429_fails_over(self):
+        def f(m, x):
+            if m == "A":
+                raise cc.GatewayError(429)
+            return "ok"
+        served, _ = cc.chat("A", [], fallback="B", chat_fn=f)
+        self.assertEqual(served, "B")
+
 
 class TestCrosscheckUnit(unittest.TestCase):
     def test_agreement(self):
@@ -187,6 +202,13 @@ class TestCrosscheckUnit(unittest.TestCase):
         r = cc.crosscheck("t", ["v"], chat_fn=lambda m, x: '{"v": "1"}')
         self.assertFalse(r["failover"])
         self.assertFalse(r["degraded"])
+
+    def test_array_response_does_not_crash(self):
+        # model returns a JSON array instead of an object -> fields become None,
+        # no AttributeError
+        r = cc.crosscheck("t", ["v"], chat_fn=lambda m, x: "[1, 2, 3]")
+        self.assertIn("v", r["fields"])
+        self.assertIsNone(r["fields"]["v"]["value"])
 
 
 class TestJudge(unittest.TestCase):

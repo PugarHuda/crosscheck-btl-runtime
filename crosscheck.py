@@ -40,7 +40,8 @@ class GatewayError(Exception):
         self.status = status
     @property
     def retryable(self):
-        return self.status >= 500  # 5xx + our 599 timeout marker
+        # 5xx + our 599 timeout marker + 429 rate-limit (gateway caps at 600 rpm)
+        return self.status >= 500 or self.status == 429
 
 
 def _http_chat(model, messages, temperature=0, response_json=True):
@@ -94,13 +95,16 @@ def _parse_json(s):
         return {}
     s = s.strip()
     s = re.sub(r"^```(?:json)?|```$", "", s, flags=re.I | re.M).strip()
+
+    def _obj(x):  # extraction expects an object; arrays/scalars aren't usable
+        return x if isinstance(x, dict) else {}
     try:
-        return json.loads(s)
+        return _obj(json.loads(s))
     except Exception:
         m = re.search(r"\{.*\}", s, re.S)
         if m:
             try:
-                return json.loads(m.group(0))
+                return _obj(json.loads(m.group(0)))
             except Exception:
                 return {}
         return {}
