@@ -46,7 +46,7 @@ python crosscheck.py bench                              # accuracy numbers over 
 python crosscheck.py extract "INVOICE Acme ... TOTAL $99" vendor total
 ```
 
-Pure Python **standard library** — no `pip install`.
+Pure Python **standard library** — no `pip install`. Requires **Python 3.8+**.
 
 ## The numbers (run `bench`)
 On a 23-sample extraction + reasoning benchmark (68 fields), pairing a cheap
