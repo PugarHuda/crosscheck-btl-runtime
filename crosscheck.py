@@ -8,7 +8,7 @@ adjudicated by a judge pass and flagged for human review. If one provider
 Pure stdlib. No pip install. Run `python crosscheck.py` for the offline
 self-check (no API key needed).
 """
-import os, re, json, socket, time
+import os, re, json, socket, time, http.client
 import urllib.request, urllib.error
 from concurrent.futures import ThreadPoolExecutor
 
@@ -17,13 +17,17 @@ API_KEY  = os.environ.get("BTL_API_KEY", "")
 
 # Only two text models are scoped for the hackathon. Confirm exact ids with
 # `python crosscheck.py models` (hits GET /v1/models) and override via env.
-MODEL_A     = os.environ.get("BTL_MODEL_A", "gpt-4o-mini")
-MODEL_B     = os.environ.get("BTL_MODEL_B", "deepseek-chat-v3")
-JUDGE_MODEL = os.environ.get("BTL_JUDGE",   "gpt-4o-mini")
+MODEL_A     = os.environ.get("BTL_MODEL_A", "gpt-4.1-mini")      # provider: openai
+MODEL_B     = os.environ.get("BTL_MODEL_B", "deepseek-chat-v3")  # provider: openrouter
+JUDGE_MODEL = os.environ.get("BTL_JUDGE",   "gpt-4.1-mini")
 
 SYS = ("You are a precise information-extraction engine. Return ONLY a JSON "
-       "object with exactly the requested keys. If a value is not present in "
-       "the text, use null. Do not guess or invent values.")
+       "object with exactly the requested keys. For each field, copy the "
+       "shortest exact value from the text that answers it — no units, "
+       "currency codes, labels, titles, or surrounding words unless the field "
+       "name explicitly asks for them. Copy verbatim as written; do not "
+       "reformat, round, or convert numbers. If a value is not present, use "
+       "null. Never guess.")
 
 
 class GatewayError(Exception):
@@ -52,8 +56,10 @@ def _http_chat(model, messages, temperature=0, response_json=True):
             payload = json.load(r)
     except urllib.error.HTTPError as e:
         raise GatewayError(e.code, e.read().decode("utf-8", "replace"))
-    except (urllib.error.URLError, socket.timeout, TimeoutError) as e:
-        raise GatewayError(599, str(e))  # network/timeout -> retryable
+    except (urllib.error.URLError, socket.timeout, TimeoutError,
+            http.client.HTTPException, ConnectionError, OSError) as e:
+        # dropped connection / IncompleteRead / timeout -> retryable, fail over
+        raise GatewayError(599, str(e))
     return payload["choices"][0]["message"]["content"]
 
 
@@ -121,8 +127,9 @@ def judge(text, field, a_val, b_val, chat_fn):
             f"Candidate A: {json.dumps(a_val)}\n"
             f"Candidate B: {json.dumps(b_val)}\n\n"
             f"Source text:\n{text}\n\n"
-            'Return JSON {"value": <the correct value from the text>, '
-            '"reason": <one short sentence>}.')
+            "Pick the value that most precisely answers the field: the shortest "
+            "exact span from the source, with no extra words, units, or labels. "
+            'Return JSON {"value": <that value>, "reason": <one short sentence>}.')
     try:
         _, content = chat(JUDGE_MODEL,
                           [{"role": "system", "content": SYS},

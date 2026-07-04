@@ -94,15 +94,15 @@ function bench(){
     <div class=grid>
       <div class=stat><b>${m.acc_a}%</b><span>${m.n_fields} fields · Model A alone</span></div>
       <div class=stat><b>${m.acc_b}%</b><span>Model B alone</span></div>
-      <div class="stat hl"><b>${m.acc_final}%</b><span>Crosscheck (final)</span></div>
+      <div class=stat><b>${m.acc_final}%</b><span>Crosscheck consensus</span></div>
     </div>
     <div class=grid>
-      <div class=stat><b>${m.catch_rate}%</b><span>of errors flagged for review</span></div>
-      <div class=stat><b>${m.flag_precision}%</b><span>flag precision</span></div>
-      <div class=stat><b>${m.blind_spot_rate}%</b><span>blind spot (both models agreed & wrong)</span></div>
-      <div class=stat><b>${m.review_burden}%</b><span>of fields sent to a human</span></div>
+      <div class="stat hl"><b>${m.flag_precision}%</b><span>flag precision (real discrepancies)</span></div>
+      <div class="stat hl"><b>${m.review_burden}%</b><span>of fields sent to a human</span></div>
+      <div class=stat><b>${m.catch_rate}%</b><span>of errors flagged</span></div>
+      <div class=stat><b>${m.blind_spot_rate}%</b><span>blind spot (providers shared the bias)</span></div>
     </div>
-    <p class=mini>${m.n_samples} samples. Blind spot is reported, not hidden — cross-check catches disagreement, not shared mistakes.</p>`;
+    <p class=mini>${m.n_samples} samples. Honest: two strong models mostly agree, so consensus accuracy ≈ the best single model — the win is the confidence signal + failover, not raw accuracy. Blind spot (shared bias) is reported, not hidden.</p>`;
   }).catch(e=>document.getElementById('status').textContent='error: '+e);
 }
 </script></body></html>"""
