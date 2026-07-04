@@ -259,6 +259,23 @@ def demo():
     except GatewayError as e:
         assert e.status == 400
 
+    # degraded mode: MODEL_A fully down -> both slots fall over to MODEL_B, so
+    # there is no real cross-check -> every field flagged, degraded=True.
+    def deg(model, messages):
+        if model == MODEL_A:
+            raise GatewayError(503, "region down")
+        return '{"x": "1", "y": "2"}'
+    d = crosscheck("t", ["x", "y"], chat_fn=deg)
+    assert d["degraded"] is True
+    assert d["servedA"] == d["servedB"] == MODEL_B
+    assert all(d["fields"][f]["needs_review"] for f in ("x", "y"))
+
+    # judge unavailable (every model errors) -> defaults to candidate A, no crash.
+    def alldown(model, messages):
+        raise GatewayError(500, "everything down")
+    j = judge("t", "f", "A-val", "B-val", chat_fn=alldown)
+    assert j["value"] == "A-val" and "unavailable" in j["reason"]
+
     # parser tolerates code fences / prose / garbage
     assert _parse_json('```json\n{"a": 1}\n```') == {"a": 1}
     assert _parse_json('Here you go: {"a": 2} done') == {"a": 2}
@@ -274,7 +291,8 @@ def demo():
     # "1200.0"); the judge resolves these numeric-format disagreements.
     assert norm("1200.00") != norm(1200.00)
 
-    print("self-check OK: agreement, judge, 5xx failover, 4xx raises, parse_json, norm")
+    print("self-check OK: agreement, judge, 5xx failover, 4xx raises, degraded mode, "
+          "judge-unavailable, parse_json, norm")
 
 
 if __name__ == "__main__":
