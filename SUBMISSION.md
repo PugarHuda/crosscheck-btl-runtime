@@ -17,7 +17,7 @@ registered email any time before then — last saved version is judged.
 > POST /v1/chat/completions — extraction across two providers (gpt-4.1-mini on the OpenAI route + gemma-3-4b-it on the OpenRouter route) plus the strong judge pass. GET /v1/models — to confirm available model ids. We also read the gateway's x-btl-customer-charge / x-btl-saved / x-btl-cache-tier response headers to show real per-run cost and cache savings. Multi-provider fan-out, cross-provider failover, and live cost visibility are the core of the project.
 
 ### Optional-but-helpful fields — fill these, they add points
-**Live app link:** https://crosscheck-app.vercel.app  *(interactive dashboard — Vercel Python serverless, API key stored as a server-side env secret, never exposed to the browser; falls back to a labeled replay of real captured results when the gateway 500s)*. Landing page: https://crosscheck-btl.vercel.app
+**Live app link:** https://crosscheck-btl.vercel.app  *(landing page; the interactive dashboard is at /app — Vercel Python serverless, API key stored as a server-side env secret, never exposed to the browser; falls back to a labeled replay of real captured results when the gateway 500s)*
 **Demo video link:** <paste after recording — script in section 2>
 **Runtime proof / request ID:**
 > Live gpt-4.1-mini call through the gateway — response id `chatcmpl_aae78595af5147369f9a6cb7a03b477d`, x-railway-request-id `7QGwTJoaTAWqLvVto3UVLg`, x-hikari-trace `sin1.tr00`, x-btl-customer-charge `0.000008`. Reproducible: `BTL_API_KEY=... python crosscheck.py bench` prints live cost read from the gateway's own headers.

@@ -3,7 +3,7 @@
 [![tests](https://github.com/PugarHuda/crosscheck-btl-runtime/actions/workflows/test.yml/badge.svg)](https://github.com/PugarHuda/crosscheck-btl-runtime/actions/workflows/test.yml)
 &nbsp;·&nbsp; [MIT](LICENSE) &nbsp;·&nbsp; [Live site](https://crosscheck-btl.vercel.app) &nbsp;·&nbsp; pure Python stdlib &nbsp;·&nbsp; 51 tests
 
-**Live dashboard:** https://crosscheck-app.vercel.app (Vercel serverless, key as a server-side secret) · **Landing:** https://crosscheck-btl.vercel.app · run locally with `python server.py`. Deploy notes: [`vercel-app/DEPLOY.md`](vercel-app/DEPLOY.md).
+**Live:** https://crosscheck-btl.vercel.app — landing page, with the interactive dashboard at **[/app](https://crosscheck-btl.vercel.app/app)** (Vercel serverless, API key as a server-side secret). Run locally with `python server.py`. Deploy notes: [`vercel-app/DEPLOY.md`](vercel-app/DEPLOY.md).
 
 ```
                  ┌─ gpt-4.1-mini  (OpenAI route) ──┐   agree     → accept (green)
