@@ -1,0 +1,39 @@
+{
+  "captured_at": 1783200338,
+  "cache": {
+    "model": "gpt-4.1-mini",
+    "cold": {
+      "ms": 1073,
+      "charge": 1.8e-05,
+      "saved": 0.0,
+      "content": "CROSSCHECK"
+    },
+    "warm": {
+      "ms": 1309,
+      "charge": 7e-06,
+      "saved": 8e-06,
+      "content": "CROSSCHECK"
+    },
+    "speedup": 0.8,
+    "cache_hit": true
+  },
+  "benchmark": null,
+  "extract": {
+    "order: 3 cartons, 12 bottles per carton.": {
+      "fields": {
+        "total_bottles": {
+          "value": "36",
+          "agree": false,
+          "needs_review": true,
+          "a": "36",
+          "b": "12",
+          "reason": "3 cartons times 12 bottles per carton equals 36 total bottles."
+        }
+      },
+      "servedA": "gpt-4.1-mini",
+      "servedB": "gemma-3-4b-it",
+      "degraded": false,
+      "failover": false
+    }
+  }
+}

@@ -375,6 +375,32 @@ class TestServerIntegration(unittest.TestCase):
         code, body = self._post("/api/nope", {})
         self.assertEqual(code, 404)
 
+    def test_extract_replays_snapshot_when_gateway_down(self):
+        old = server.SNAP
+        server.SNAP = {"extract": {"boom": {
+            "fields": {"a": {"value": "cached", "agree": True,
+                             "needs_review": False, "a": "cached", "b": "cached",
+                             "reason": ""}},
+            "servedA": "m", "servedB": "m", "degraded": False, "failover": False}}}
+        try:
+            with mock.patch.object(cc, "crosscheck", side_effect=cc.GatewayError(500)):
+                code, body = self._post("/api/extract", {"text": "boom", "fields": ["a"]})
+            self.assertEqual(code, 200)
+            self.assertTrue(body.get("replay"))
+            self.assertEqual(body["fields"]["a"]["value"], "cached")
+        finally:
+            server.SNAP = old
+
+    def test_no_snapshot_still_502s(self):
+        old = server.SNAP
+        server.SNAP = {}
+        try:
+            with mock.patch.object(cc, "crosscheck", side_effect=cc.GatewayError(500)):
+                code, body = self._post("/api/extract", {"text": "x", "fields": ["a"]})
+            self.assertEqual(code, 502)
+        finally:
+            server.SNAP = old
+
 
 # ============================ LIVE: real gateway =========================
 @unittest.skipUnless(os.environ.get("BTL_API_KEY"), "set BTL_API_KEY for live tests")

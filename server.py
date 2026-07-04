@@ -25,6 +25,7 @@ def validate_extract(req):
 
 PORT = int(os.environ.get("PORT", "8000"))
 HERE = os.path.dirname(__file__)
+SNAP = cc.load_snapshot()  # real captured results; replayed if the gateway is down
 
 PAGE = """<!doctype html><html><head><meta charset=utf-8>
 <title>Crosscheck · BTL Runtime</title><meta name=viewport content="width=device-width,initial-scale=1">
@@ -89,6 +90,7 @@ function render(d){
   document.getElementById('status').textContent='';
   let h='';
   if(d.error){document.getElementById('out').innerHTML=`<div class="banner warn">gateway error: ${d.error}</div>`;return;}
+  if(d.replay) h+=`<div class="banner warn">↻ Replay — the gateway was unavailable, so this is a previously captured real result.</div>`;
   if(d.degraded) h+=`<div class="banner warn">⚠ Degraded: both requests served by <b>${d.servedA}</b> — the other provider failed over. Cross-check disabled, all fields flagged.</div>`;
   else if(d.failover) h+=`<div class="banner warn">↺ Failover: a provider errored, so the request was served by ${d.servedA} + ${d.servedB}.</div>`;
   h+=`<p class=mini>served by ${d.servedA} + ${d.servedB}</p>`;
@@ -110,6 +112,7 @@ function cacheDemo(){
     document.getElementById('status').textContent='';
     if(d.error){document.getElementById('cacheout').innerHTML=`<div class="banner warn">${d.error}</div>`;return;}
     document.getElementById('cacheout').innerHTML=`
+    ${d.replay?'<div class="banner warn">↻ Replay — gateway was unavailable; previously captured real timings.</div>':''}
     <div class=grid>
       <div class=stat><b>${d.cold.ms}ms</b><span>1st call · cold (miss)</span></div>
       <div class="stat hl"><b>${d.warm.ms}ms</b><span>2nd call · ${d.cache_hit?'cache HIT ⚡':'warm'}</span></div>
@@ -126,6 +129,7 @@ function bench(){
     document.getElementById('status').textContent='';
     if(m.error){document.getElementById('benchout').innerHTML=`<div class="banner warn">${m.error}</div>`;return;}
     document.getElementById('benchout').innerHTML=`
+    ${m.replay?'<div class="banner warn">↻ Replay — gateway was unavailable; these are previously captured real numbers.</div>':''}
     <div class=grid>
       <div class=stat><b>${m.acc_b}%</b><span>${m.n_fields} fields · Cheap model alone</span></div>
       <div class="stat hl"><b>${m.acc_final}%</b><span>Crosscheck</span></div>
@@ -177,6 +181,8 @@ class H(http.server.BaseHTTPRequestHandler):
             try:
                 return self._send(200, json.dumps(cc.cache_demo()))
             except Exception as e:
+                if SNAP.get("cache"):
+                    return self._send(200, json.dumps({**SNAP["cache"], "replay": True}))
                 return self._send(200, json.dumps({"error": str(e)}))
         if self.path == "/api/benchmark":
             try:
@@ -186,6 +192,8 @@ class H(http.server.BaseHTTPRequestHandler):
                 m.pop("rows", None)
                 return self._send(200, json.dumps(m))
             except Exception as e:
+                if SNAP.get("benchmark"):
+                    return self._send(200, json.dumps({**SNAP["benchmark"], "replay": True}))
                 return self._send(200, json.dumps({"error": str(e)}))
         return self._send(404, json.dumps({"error": "not found"}))
 
@@ -204,6 +212,9 @@ class H(http.server.BaseHTTPRequestHandler):
             r = cc.crosscheck(req["text"], req["fields"])
             return self._send(200, json.dumps(r))
         except Exception as e:
+            snap = SNAP.get("extract", {}).get(req["text"].strip().lower())
+            if snap:
+                return self._send(200, json.dumps({**snap, "replay": True}))
             return self._send(502, json.dumps({"error": str(e)}))
 
 

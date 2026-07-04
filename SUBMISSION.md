@@ -65,6 +65,7 @@ Total ~115s. Record at 1080p, browser zoomed so text is readable. Speak calmly.
 - [ ] `$env:BTL_API_KEY` set; `python crosscheck.py models` → confirm `gemma-3-4b-it` + `gpt-4.1-mini` exist; override `BTL_MODEL_B` if needed
 - [ ] `python crosscheck.py bench` once → confirm `acc_final` > `acc_b` (cheap model) — note the real numbers so you can re-say them if the live run stalls
 - [ ] `python server.py`, browser at localhost:8000, zoom to ~125%
+- [ ] **When the gateway is healthy, run `python crosscheck.py snapshot`** — captures real cache + the 12→36 catch + benchmark so the dashboard can replay them (labeled) if the gateway 500s mid-demo. (Current snapshot has the catch + cache; top up the benchmark on a good window.)
 - [ ] Do one full dry run of the script end to end before recording
 - [ ] Repo pushed, key NOT committed (it only lives in the env var — good)
 

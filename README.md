@@ -29,6 +29,7 @@ of the BTL runtime.
 - `GET /v1/models` — verify available model ids
 - **Savings headers** — `x-btl-customer-charge` / `x-btl-saved` / `x-btl-cache-tier` read off each response to show real per-run cost and cache savings
 - **Exact-cache demo** — the dashboard's "⚡ Demo exact cache" fires the same prompt twice; the second call is a cache hit (measured ~1.5–2.4× faster, `x-btl-saved` > 0) — a live proof of a BTL-flagship feature
+- **Demo resilience** — the gateway is genuinely flaky (frequent 500s). `snapshot` captures real results; if a live call fails during a demo, the dashboard replays the captured real result with a clearly-labeled "↻ Replay" banner, so a live presentation can't die on a transient outage
 
 ## Run
 ```bash
@@ -49,6 +50,7 @@ python crosscheck.py bench                              # accuracy + real cost o
 python crosscheck.py cache                              # prove the exact cache: same prompt twice, faster+cheaper 2nd call
 python crosscheck.py extract "INVOICE Acme ... TOTAL $99" vendor total
 cat records.jsonl | python crosscheck.py batch         # verify many records: JSONL in -> verified JSONL out (+flagged fields)
+python crosscheck.py snapshot                          # capture REAL results; the dashboard replays them (labeled) if the gateway is down
 ```
 
 Pure Python **standard library** — no `pip install`. Requires **Python 3.8+**.

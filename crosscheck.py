@@ -328,6 +328,48 @@ def batch(records, chat_fn=None):
     return out
 
 
+DEMO_SNAPSHOT = os.path.join(os.path.dirname(__file__), "demo_snapshot.json")
+HERO_TEXT = "Order: 3 cartons, 12 bottles per carton."
+
+
+def load_snapshot():
+    try:
+        with open(DEMO_SNAPSHOT, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def snapshot():
+    """Capture REAL gateway results once so a live demo can replay them if the
+    gateway is down (it is genuinely flaky). Each piece is captured independently
+    so a partial outage still yields a usable snapshot."""
+    # merge with any existing snapshot: a failed capture keeps the prior good one
+    data = load_snapshot() or {}
+    data["captured_at"] = int(time.time())
+    data.setdefault("extract", {})
+    try:
+        data["cache"] = cache_demo()
+    except Exception as e:
+        print("cache snapshot failed (keeping prior):", e)
+    try:
+        r = crosscheck(HERO_TEXT, ["total_bottles"])
+        data["extract"][HERO_TEXT.strip().lower()] = r
+    except Exception as e:
+        print("extract snapshot failed (keeping prior):", e)
+    try:
+        with open(os.path.join(os.path.dirname(__file__), "samples.json"), encoding="utf-8") as f:
+            samples = json.load(f)
+        m = run_benchmark(samples)
+        m.pop("rows", None)
+        data["benchmark"] = m
+    except Exception as e:
+        print("benchmark snapshot failed (keeping prior):", e)
+    with open(DEMO_SNAPSHOT, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    return data
+
+
 def list_models():
     req = urllib.request.Request(API_BASE + "/models",
                                  headers={"Authorization": f"Bearer {API_KEY}"})
@@ -425,6 +467,9 @@ if __name__ == "__main__":
         print(json.dumps({k: v for k, v in m.items() if k != "rows"}, indent=2))
     elif cmd == "cache":
         print(json.dumps(cache_demo(), indent=2))
+    elif cmd == "snapshot":
+        snapshot()
+        print(f"saved real results to {DEMO_SNAPSHOT} (demo replays these if the gateway is down)")
     elif cmd == "batch":
         src = open(sys.argv[2], encoding="utf-8") if len(sys.argv) > 2 else sys.stdin
         records = [json.loads(ln) for ln in src if ln.strip()]
