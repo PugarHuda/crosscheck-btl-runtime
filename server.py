@@ -222,7 +222,7 @@ function bench(){
       <div class=stat><b>${m.api_calls}</b><span>API calls (${m.cached_calls} cached)</span></div>
       <div class=stat><b>${m.n_fields}</b><span>fields verified</span></div>
     </div>
-    <p class=mini>${m.n_samples} samples. Crosscheck runs BOTH models on every field (it's a verification layer, not a cost saver) — the judge only fires on the ~${m.review_burden}% that disagree. Cost is measured live from the gateway's x-btl-customer-charge header. Blind spot (both models share the bias) is reported, not hidden.</p>`;
+    <p class=mini>${m.n_samples} samples${m.partial?' · partial live subset — full 23-sample run is local (python crosscheck.py bench)':''}. Crosscheck runs BOTH models on every field (it's a verification layer, not a cost saver) — the judge only fires on the ~${m.review_burden}% that disagree. Cost is measured live from the gateway's x-btl-customer-charge header. Blind spot (both models share the bias) is reported, not hidden.</p>`;
   }).catch(err);
 }
 </script></body></html>"""
