@@ -17,9 +17,13 @@ API_KEY  = os.environ.get("BTL_API_KEY", "")
 
 # Only two text models are scoped for the hackathon. Confirm exact ids with
 # `python crosscheck.py models` (hits GET /v1/models) and override via env.
-MODEL_A     = os.environ.get("BTL_MODEL_A", "gpt-4.1-mini")      # provider: openai
-MODEL_B     = os.environ.get("BTL_MODEL_B", "deepseek-chat-v3")  # provider: openrouter
-JUDGE_MODEL = os.environ.get("BTL_JUDGE",   "gpt-4.1-mini")
+# Demo pairing: a cheap bulk model cross-checked against a strong reference.
+# When they disagree, the strong judge resolves it — so you get strong-model
+# accuracy while the cheap model handles the (large) agreed majority alone.
+# Set both to same-tier providers for a peer cross-check instead.
+MODEL_A     = os.environ.get("BTL_MODEL_A", "gpt-4.1-mini")      # strong reference (openai)
+MODEL_B     = os.environ.get("BTL_MODEL_B", "gemma-3-4b-it")     # cheap bulk model (openrouter)
+JUDGE_MODEL = os.environ.get("BTL_JUDGE",   "gpt-4.1-mini")      # strong model adjudicates disputes
 
 SYS = ("You are a precise information-extraction engine. Return ONLY a JSON "
        "object with exactly the requested keys. For each field, copy the "
