@@ -1,6 +1,6 @@
 # Crosscheck — a reliability layer on the BTL runtime
 
-**Visual showcase:** https://claude.ai/code/artifact/9bca3cea-1dfc-49dd-a5c0-15d29b313539 · or open [`showcase.html`](showcase.html) locally.
+**Live site:** https://crosscheck-btl.vercel.app · source in [`web/index.html`](web/index.html) (deployed to Vercel). The interactive dashboard runs locally via `python server.py`.
 
 Single LLM calls fail silently: a model returns a confident, wrong value and you
 never know. Crosscheck sends the **same extraction prompt to two providers in
