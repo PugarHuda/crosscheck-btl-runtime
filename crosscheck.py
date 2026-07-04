@@ -67,12 +67,13 @@ def _http_chat(model, messages, temperature=0, response_json=True):
     return payload["choices"][0]["message"]["content"]
 
 
-def chat(model, messages, fallback=None, chat_fn=_http_chat, retries=1):
+def chat(model, messages, fallback=None, chat_fn=None, retries=1):
     """Call `model`; retry on 5xx, then fail over to `fallback`.
 
     Returns (model_that_answered, content). Raises the last GatewayError if
     every option is exhausted.
     """
+    chat_fn = chat_fn or _http_chat  # resolved at call time so tests can patch
     last = None
     for m in [model] + ([fallback] if fallback and fallback != model else []):
         for attempt in range(retries + 1):
@@ -145,8 +146,9 @@ def judge(text, field, a_val, b_val, chat_fn):
         return {"value": a_val, "reason": "judge unavailable — defaulted to A"}
 
 
-def crosscheck(text, fields, chat_fn=_http_chat):
+def crosscheck(text, fields, chat_fn=None):
     """Run both providers, compare per field, judge disagreements."""
+    chat_fn = chat_fn or _http_chat
     with ThreadPoolExecutor(max_workers=2) as ex:
         fa = ex.submit(extract, MODEL_A, MODEL_B, text, fields, chat_fn)
         fb = ex.submit(extract, MODEL_B, MODEL_A, text, fields, chat_fn)
@@ -168,9 +170,10 @@ def crosscheck(text, fields, chat_fn=_http_chat):
             "degraded": degraded}
 
 
-def run_benchmark(samples, chat_fn=_http_chat, progress=None):
+def run_benchmark(samples, chat_fn=None, progress=None):
     """Score crosscheck vs each single model on labeled samples.
     Sequential on purpose — the gateway rate-limits (observed 429s)."""
+    chat_fn = chat_fn or _http_chat
     n_fields = a_ok = b_ok = final_ok = 0
     err_fields = caught = flagged = flagged_true = 0
     rows = []

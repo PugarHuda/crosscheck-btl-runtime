@@ -64,7 +64,24 @@ Honest caveat: two *same-tier* strong models rarely disagree (≈93% either way,
 boost — verified with gpt-4.1-mini + deepseek-chat-v3). Cross-checking earns its
 keep when the two models differ in capability, so you can run the cheap one safely.
 
+## Tests
+Pure stdlib `unittest` — no pytest, no pip.
+```bash
+python test_crosscheck.py            # unit + integration (gateway mocked, no key needed)
+BTL_API_KEY=... python test_crosscheck.py   # also runs 3 live gateway tests
+```
+- **unit** — `norm`, `_parse_json`, `validate_extract`, `GatewayError.retryable`,
+  failover (5xx fails over, 4xx raises), agreement / disagreement→judge / degraded,
+  judge-unavailable, benchmark scoring.
+- **integration** — the real HTTP server driven over a socket with the gateway
+  mocked: routing, input validation (400s), JSON serialization, 404s, `/api/benchmark`.
+- **live** — real gateway; a persistent 5xx *skips* (the gateway is genuinely flaky),
+  so the suite verifies our integration, not the gateway's uptime.
+
+`python crosscheck.py` and `python server.py test` also run quick embedded self-checks.
+
 ## Files
 - `crosscheck.py` — core (gateway client + failover, fan-out, judge, benchmark, self-check)
-- `server.py` — dashboard (stdlib http.server)
+- `server.py` — dashboard (stdlib http.server) + input validation
 - `samples.json` — labeled extraction benchmark
+- `test_crosscheck.py` — unit + integration + live test suite
