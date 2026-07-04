@@ -8,7 +8,7 @@ adjudicated by a judge pass and flagged for human review. If one provider
 Pure stdlib. No pip install. Run `python crosscheck.py` for the offline
 self-check (no API key needed).
 """
-import os, re, json, socket, time, http.client
+import os, re, json, socket, time, http.client, threading
 import urllib.request, urllib.error
 from concurrent.futures import ThreadPoolExecutor
 
@@ -32,6 +32,39 @@ SYS = ("You are a precise information-extraction engine. Return ONLY a JSON "
        "name explicitly asks for them. Copy verbatim as written; do not "
        "reformat, round, or convert numbers. If a value is not present, use "
        "null. Never guess.")
+
+
+# --- cost meter: the gateway reports real cost per call via response headers.
+# ponytail: one global accumulator, fine for this single-user local tool; a
+# concurrent extract during a benchmark would over-count slightly.
+_cost_lock = threading.Lock()
+_cost = {"charge": 0.0, "saved": 0.0, "calls": 0, "cached": 0}
+
+
+def reset_cost():
+    with _cost_lock:
+        _cost.update(charge=0.0, saved=0.0, calls=0, cached=0)
+
+
+def get_cost():
+    with _cost_lock:
+        return dict(_cost)
+
+
+def _record_cost(headers):
+    """Accumulate x-btl-* cost headers (headers.get works on HTTPMessage/dict)."""
+    def num(k):
+        try:
+            return float(headers.get(k) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+    tier = (headers.get("x-btl-cache-tier") or "").strip().lower()
+    with _cost_lock:
+        _cost["calls"] += 1
+        _cost["charge"] += num("x-btl-customer-charge")
+        _cost["saved"] += num("x-btl-saved")
+        if tier and tier not in ("miss", "none", "bypass"):
+            _cost["cached"] += 1
 
 
 class GatewayError(Exception):
@@ -58,6 +91,7 @@ def _http_chat(model, messages, temperature=0, response_json=True):
                  "Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
+            hdrs = r.headers
             payload = json.load(r)
     except urllib.error.HTTPError as e:
         raise GatewayError(e.code, e.read().decode("utf-8", "replace"))
@@ -65,6 +99,7 @@ def _http_chat(model, messages, temperature=0, response_json=True):
             http.client.HTTPException, ConnectionError, OSError) as e:
         # dropped connection / IncompleteRead / timeout -> retryable, fail over
         raise GatewayError(599, str(e))
+    _record_cost(hdrs)
     return payload["choices"][0]["message"]["content"]
 
 
@@ -179,6 +214,7 @@ def run_benchmark(samples, chat_fn=None, progress=None):
     """Score crosscheck vs each single model on labeled samples.
     Sequential on purpose — the gateway rate-limits (observed 429s)."""
     chat_fn = chat_fn or _http_chat
+    reset_cost()
     n_fields = a_ok = b_ok = final_ok = 0
     err_fields = caught = flagged = flagged_true = 0
     rows = []
@@ -209,6 +245,7 @@ def run_benchmark(samples, chat_fn=None, progress=None):
             progress(i + 1, len(samples))
 
     pct = lambda x, n: round(100 * x / n, 1) if n else 0.0
+    c = get_cost()
     return {
         "n_samples": len(samples), "n_fields": n_fields,
         "acc_a": pct(a_ok, n_fields), "acc_b": pct(b_ok, n_fields),
@@ -217,6 +254,9 @@ def run_benchmark(samples, chat_fn=None, progress=None):
         "flag_precision": pct(flagged_true, flagged),  # of flags, % that were real errors
         "blind_spot_rate": pct(err_fields - caught, err_fields),  # errors both models shared
         "review_burden": pct(flagged, n_fields),     # % of fields sent to a human
+        "cost_usd": round(c["charge"], 4),           # real gateway charge for this run
+        "saved_usd": round(c["saved"], 4),           # saved by the gateway's exact cache
+        "api_calls": c["calls"], "cached_calls": c["cached"],
         "rows": rows,
     }
 

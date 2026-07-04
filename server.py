@@ -114,12 +114,18 @@ function bench(){
       <div class=stat><b>${m.acc_a}%</b><span>Strong model alone</span></div>
     </div>
     <div class=grid>
-      <div class="stat hl"><b>${m.review_burden}%</b><span>escalated to strong model</span></div>
-      <div class=stat><b>${m.flag_precision}%</b><span>flag precision</span></div>
+      <div class="stat hl"><b>${m.flag_precision}%</b><span>flag precision</span></div>
+      <div class=stat><b>${m.review_burden}%</b><span>flagged (judge fired)</span></div>
       <div class=stat><b>${m.catch_rate}%</b><span>of errors flagged</span></div>
       <div class=stat><b>${m.blind_spot_rate}%</b><span>blind spot (shared bias)</span></div>
     </div>
-    <p class=mini>${m.n_samples} samples. Cheap model does the bulk; Crosscheck escalates only the disagreements to the strong model, lifting accuracy toward strong-model level at a fraction of the cost. Blind spot (both models share the bias) is reported, not hidden.</p>`;
+    <div class=grid>
+      <div class="stat hl"><b>$${m.cost_usd}</b><span>real gateway charge · this run</span></div>
+      <div class=stat><b>$${m.saved_usd}</b><span>saved by exact cache</span></div>
+      <div class=stat><b>${m.api_calls}</b><span>API calls (${m.cached_calls} cached)</span></div>
+      <div class=stat><b>${m.n_fields}</b><span>fields verified</span></div>
+    </div>
+    <p class=mini>${m.n_samples} samples. Crosscheck runs BOTH models on every field (it's a verification layer, not a cost saver) — the judge only fires on the ~${m.review_burden}% that disagree. Cost is measured live from the gateway's x-btl-customer-charge header. Blind spot (both models share the bias) is reported, not hidden.</p>`;
   }).catch(e=>document.getElementById('status').textContent='error: '+e);
 }
 </script></body></html>"""

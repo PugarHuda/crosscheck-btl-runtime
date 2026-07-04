@@ -12,10 +12,12 @@ parallel through the BTL gateway**, then:
   resilience is a feature here, not a nice-to-have.)
 
 The default demo pairs a **cheap bulk model** (`gemma-3-4b-it`) against a **strong
-reference** (`gpt-4.1-mini`): the cheap model handles the easy majority, and only
-the fields where it diverges get escalated to the strong model. You get
-near-strong accuracy at mostly-cheap cost. Point both at same-tier providers for a
-peer cross-check instead.
+reference** (`gpt-4.1-mini`): both run on every field (this is a **verification
+layer**, not a cost saver), and the strong model — as judge — resolves the ~10% of
+fields where they disagree, catching the cheap model's silent errors. The gateway
+reports the real per-run charge via its `x-btl-customer-charge` header, so you see
+exactly what verification costs. Point both at same-tier providers for a peer
+cross-check instead.
 
 This is only possible *because* it's a multi-provider gateway — the whole point
 of the BTL runtime.
@@ -23,6 +25,7 @@ of the BTL runtime.
 ## BTL runtime endpoints used
 - `POST /v1/chat/completions` — extraction (×2 providers) + judge, via `gpt-4.1-mini` (OpenAI route) and `gemma-3-4b-it` (OpenRouter route) — two different providers behind one gateway
 - `GET /v1/models` — verify available model ids
+- **Savings headers** — `x-btl-customer-charge` / `x-btl-saved` / `x-btl-cache-tier` read off each response to show real per-run cost and cache savings
 
 ## Run
 ```bash
@@ -54,11 +57,14 @@ On a 23-sample extraction + reasoning benchmark (68 fields), pairing a cheap
   instead of `36`; `Net 30 from Jul 1 → Jul 1` instead of `Jul 31`; `12 − 9 seats
   → 9` instead of `3`) get flagged and fixed by the judge, approaching the strong
   model's **94.1%**.
-- **Escalation / review burden: 10.3%** — only ~1 field in 10 ever needed the
-  strong model; the cheap model handled the rest alone.
+- **Judge fired on 10.3%** — both models run on every field; the third (judge)
+  call only fires on the ~1-in-10 that disagree, so adjudication overhead is small.
 - **Flag precision: 100%** — every flag was a genuine discrepancy.
 - **Blind spot: 22%** — errors where *both* models made the same choice;
   cross-checking is blind to shared bias. Reported, not hidden.
+- **Measured cost: ~$0.004** for the whole run (53 API calls), read live from the
+  gateway's `x-btl-customer-charge` header — not estimated. Verification is a
+  fraction of a cent; the gateway's exact cache trims repeat traffic further.
 
 Honest caveat: two *same-tier* strong models rarely disagree (≈93% either way, no
 boost — verified with gpt-4.1-mini + deepseek-chat-v3). Cross-checking earns its

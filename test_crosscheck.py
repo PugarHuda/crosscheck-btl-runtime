@@ -99,7 +99,7 @@ class TestHttpChat(unittest.TestCase):
     """_http_chat error mapping — mock urlopen, no network."""
     class _Resp:
         def __init__(self, data=None, exc=None):
-            self.data, self.exc = data, exc
+            self.data, self.exc, self.headers = data, exc, {}
         def __enter__(self): return self
         def __exit__(self, *a): return False
         def read(self, *a):
@@ -243,6 +243,35 @@ class TestBenchmarkScoring(unittest.TestCase):
         self.assertEqual(m["flag_precision"], 100.0)
         self.assertEqual(m["review_burden"], 100.0)   # the one field was flagged
         self.assertEqual(m["acc_final"], 100.0)        # judge fixed it
+
+
+class TestCost(unittest.TestCase):
+    def test_record_reset_and_cache_count(self):
+        cc.reset_cost()
+        cc._record_cost({"x-btl-customer-charge": "0.0022", "x-btl-saved": "0.001",
+                         "x-btl-cache-tier": "exact_response_cache"})
+        cc._record_cost({"x-btl-customer-charge": "0.0010", "x-btl-saved": "0",
+                         "x-btl-cache-tier": "miss"})
+        c = cc.get_cost()
+        self.assertAlmostEqual(c["charge"], 0.0032)
+        self.assertAlmostEqual(c["saved"], 0.001)
+        self.assertEqual(c["calls"], 2)
+        self.assertEqual(c["cached"], 1)   # one hit, one miss
+        cc.reset_cost()
+        self.assertEqual(cc.get_cost()["calls"], 0)
+
+    def test_missing_headers_are_zero(self):
+        cc.reset_cost()
+        cc._record_cost({})
+        c = cc.get_cost()
+        self.assertEqual(c["calls"], 1)
+        self.assertEqual(c["charge"], 0.0)
+
+    def test_benchmark_reports_cost_keys(self):
+        m = cc.run_benchmark([{"text": "q", "fields": {"n": "1"}}],
+                             chat_fn=lambda mm, x: '{"n": "1"}')
+        for k in ("cost_usd", "saved_usd", "api_calls", "cached_calls"):
+            self.assertIn(k, m)
 
 
 # ================= INTEGRATION: real HTTP server, mocked gateway =========
