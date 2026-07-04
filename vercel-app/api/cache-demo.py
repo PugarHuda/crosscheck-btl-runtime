@@ -15,10 +15,4 @@ def _send(h, code, obj):
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        try:
-            _send(self, 200, cc.cache_demo())
-        except Exception as e:
-            snap = cc.load_snapshot().get("cache")
-            if snap:
-                return _send(self, 200, {**snap, "replay": True})
-            _send(self, 200, {"error": str(e)})
+        _send(self, 200, cc.api_cache())

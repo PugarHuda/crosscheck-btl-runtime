@@ -3,29 +3,14 @@
     set BTL_API_KEY=...    (PowerShell: $env:BTL_API_KEY="...")
     python server.py       -> http://localhost:8000
 """
-import os, sys, time, json, http.server, socketserver
+import os, sys, json, http.server, socketserver
 import crosscheck as cc
 
-
-def validate_extract(req):
-    """Return an error string for a bad /api/extract body, or None if valid."""
-    if not isinstance(req, dict):
-        return "body must be a JSON object"
-    if not isinstance(req.get("text"), str) or not req["text"].strip():
-        return "field 'text' must be a non-empty string"
-    fs = req.get("fields")
-    if (not isinstance(fs, list) or not fs
-            or not all(isinstance(x, str) and x.strip() for x in fs)):
-        return "field 'fields' must be a non-empty list of strings"
-    if len(req["text"]) > 20000:
-        return "field 'text' too long (max 20000 chars)"
-    if len(fs) > 40:
-        return "too many fields (max 40)"
-    return None
+# request logic lives in crosscheck.py (shared with the Vercel serverless functions)
+validate_extract = cc.validate_extract
 
 PORT = int(os.environ.get("PORT", "8000"))
 HERE = os.path.dirname(__file__)
-SNAP = cc.load_snapshot()  # real captured results; replayed if the gateway is down
 
 PAGE = """<!doctype html><html><head><meta charset=utf-8>
 <title>Crosscheck · BTL Runtime</title><meta name=viewport content="width=device-width,initial-scale=1">
@@ -95,7 +80,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
 <div class=frame>
   <div class=top>
     <div class=brand>
-      <svg class=mark viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x=2 y=2 width=6 height=6/><rect x=16 y=2 width=6 height=6/><rect x=9 y=9 width=6 height=6/><rect x=2 y=16 width=6 height=6/><rect x=16 y=16 width=6 height=6/></svg>
+      <svg class=mark viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x=2 y=2 width=6 height=6 /><rect x=16 y=2 width=6 height=6 /><rect x=9 y=9 width=6 height=6 /><rect x=2 y=16 width=6 height=6 /><rect x=16 y=16 width=6 height=6 /></svg>
       crosscheck.
     </div>
     <div class=toplinks>
@@ -245,36 +230,17 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._send(200, PAGE, "text/html; charset=utf-8")
         if self.path == "/api/samples":
             try:
-                with open(os.path.join(HERE, "samples.json"), encoding="utf-8") as f:
-                    data = json.load(f)
-                out = [{"text": s["text"], "fields": list(s["fields"].keys()),
-                        "preview": s["text"].split("\n")[0][:40]} for s in data]
-                return self._send(200, json.dumps(out))
-            except (OSError, ValueError) as e:
-                return self._send(500, json.dumps({"error": f"samples.json: {e}"}))
+                return self._send(200, json.dumps(cc.api_samples()))
+            except Exception as e:
+                return self._send(500, json.dumps({"error": str(e)}))
         if self.path == "/api/health":
-            try:
-                cc.list_models()
-                return self._send(200, json.dumps({"ok": True}))
-            except Exception as e:
-                return self._send(200, json.dumps({"ok": False, "error": str(e)}))
+            return self._send(200, json.dumps(cc.api_health()))
         if self.path == "/api/cache-demo":
-            try:
-                return self._send(200, json.dumps(cc.cache_demo()))
-            except Exception as e:
-                if SNAP.get("cache"):
-                    return self._send(200, json.dumps({**SNAP["cache"], "replay": True}))
-                return self._send(200, json.dumps({"error": str(e)}))
+            return self._send(200, json.dumps(cc.api_cache()))
         if self.path == "/api/benchmark":
             try:
-                with open(os.path.join(HERE, "samples.json"), encoding="utf-8") as f:
-                    samples = json.load(f)
-                m = cc.run_benchmark(samples)
-                m.pop("rows", None)
-                return self._send(200, json.dumps(m))
+                return self._send(200, json.dumps(cc.api_benchmark()))
             except Exception as e:
-                if SNAP.get("benchmark"):
-                    return self._send(200, json.dumps({**SNAP["benchmark"], "replay": True}))
                 return self._send(200, json.dumps({"error": str(e)}))
         return self._send(404, json.dumps({"error": "not found"}))
 
@@ -286,22 +252,8 @@ class H(http.server.BaseHTTPRequestHandler):
             req = json.loads(self.rfile.read(n) or b"{}")
         except (ValueError, json.JSONDecodeError):
             return self._send(400, json.dumps({"error": "invalid JSON body"}))
-        err = validate_extract(req)
-        if err:
-            return self._send(400, json.dumps({"error": err}))
-        try:
-            cc.reset_cost()
-            t0 = time.time()
-            r = cc.crosscheck(req["text"], req["fields"])
-            r["cost_usd"] = round(cc.get_cost()["charge"], 6)
-            r["ms"] = round((time.time() - t0) * 1000)
-            return self._send(200, json.dumps(r))
-        except Exception as e:
-            snap = SNAP.get("extract", {}).get(req["text"].strip().lower())
-            # only replay if the snapshot actually covers the fields asked for
-            if snap and all(f in snap.get("fields", {}) for f in req["fields"]):
-                return self._send(200, json.dumps({**snap, "replay": True}))
-            return self._send(502, json.dumps({"error": str(e)}))
+        code, obj = cc.api_extract(req)
+        return self._send(code, json.dumps(obj))
 
 
 def _selfcheck():

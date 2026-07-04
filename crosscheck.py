@@ -376,6 +376,84 @@ def snapshot():
     return data
 
 
+# --- shared request handlers: one source of truth for the local server AND the
+# Vercel serverless functions. Transport-agnostic (return plain code/dict).
+def validate_extract(req):
+    if not isinstance(req, dict):
+        return "body must be a JSON object"
+    if not isinstance(req.get("text"), str) or not req["text"].strip():
+        return "field 'text' must be a non-empty string"
+    fs = req.get("fields")
+    if (not isinstance(fs, list) or not fs
+            or not all(isinstance(x, str) and x.strip() for x in fs)):
+        return "field 'fields' must be a non-empty list of strings"
+    if len(req["text"]) > 20000:
+        return "field 'text' too long (max 20000 chars)"
+    if len(fs) > 40:
+        return "too many fields (max 40)"
+    return None
+
+
+def api_samples():
+    with open(os.path.join(os.path.dirname(__file__), "samples.json"), encoding="utf-8") as f:
+        data = json.load(f)
+    return [{"text": s["text"], "fields": list(s["fields"].keys()),
+             "preview": s["text"].split("\n")[0][:40]} for s in data]
+
+
+def api_extract(req):
+    """(status, body) — validate, run, attach cost/latency, replay on outage."""
+    err = validate_extract(req)
+    if err:
+        return 400, {"error": err}
+    try:
+        reset_cost()
+        t0 = time.time()
+        r = crosscheck(req["text"], req["fields"])
+        r["cost_usd"] = round(get_cost()["charge"], 6)
+        r["ms"] = round((time.time() - t0) * 1000)
+        return 200, r
+    except Exception as e:
+        snap = load_snapshot().get("extract", {}).get(req["text"].strip().lower())
+        if snap and all(f in snap.get("fields", {}) for f in req["fields"]):
+            return 200, {**snap, "replay": True}
+        return 502, {"error": str(e)}
+
+
+def api_benchmark(partial=False):
+    """Snapshot if captured; else run the full set (local) or a representative
+    easy+hard subset (partial, for the serverless time limit)."""
+    snap = load_snapshot().get("benchmark")
+    if snap:
+        return {**snap, "replay": True}
+    with open(os.path.join(os.path.dirname(__file__), "samples.json"), encoding="utf-8") as f:
+        data = json.load(f)
+    samples = (data[:2] + data[15:19]) if partial else data
+    m = run_benchmark(samples)
+    m.pop("rows", None)
+    if partial:
+        m["partial"] = True
+    return m
+
+
+def api_cache():
+    try:
+        return cache_demo()
+    except Exception as e:
+        snap = load_snapshot().get("cache")
+        if snap:
+            return {**snap, "replay": True}
+        return {"error": str(e)}
+
+
+def api_health():
+    try:
+        list_models()
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def list_models():
     req = urllib.request.Request(API_BASE + "/models",
                                  headers={"Authorization": f"Bearer {API_KEY}"})

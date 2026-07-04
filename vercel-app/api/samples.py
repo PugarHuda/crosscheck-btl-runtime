@@ -16,10 +16,6 @@ def _send(h, code, obj):
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
-            with open(os.path.join(os.path.dirname(cc.__file__), "samples.json"), encoding="utf-8") as f:
-                data = json.load(f)
-            out = [{"text": s["text"], "fields": list(s["fields"].keys()),
-                    "preview": s["text"].split("\n")[0][:40]} for s in data]
-            _send(self, 200, out)
+            _send(self, 200, cc.api_samples())
         except Exception as e:
             _send(self, 500, {"error": str(e)})

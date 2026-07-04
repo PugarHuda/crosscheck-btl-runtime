@@ -15,8 +15,4 @@ def _send(h, code, obj):
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        try:
-            cc.list_models()
-            _send(self, 200, {"ok": True})
-        except Exception as e:
-            _send(self, 200, {"ok": False, "error": str(e)})
+        _send(self, 200, cc.api_health())
