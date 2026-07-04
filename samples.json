@@ -1,0 +1,62 @@
+[
+  {
+    "text": "INVOICE  Acme Robotics LLC\nBill to: Nakamura Foods\nInv #AR-2291   Date: 03/14/2026\n2x servo arm @ 450.00 ... 900.00\nShipping 60.00\nSubtotal 960.00  Tax 76.80\nTOTAL DUE: $1,036.80   Terms: Net 30",
+    "fields": {"vendor": "Acme Robotics LLC", "invoice_no": "AR-2291", "total": "$1,036.80", "terms": "Net 30"}
+  },
+  {
+    "text": "Payment receipt — thanks for your order!\nMerchant: BlueBottle Coffee (order #7741188)\nCharged 24.50 USD to Visa ****4021 on Jul 1 2026.\nItems: 2 bags Ethiopia, 1 filter kit.",
+    "fields": {"merchant": "BlueBottle Coffee", "order_no": "7741188", "amount": "24.50", "card_last4": "4021"}
+  },
+  {
+    "text": "From: Dr. Elena Vasquez <e.vasquez@northshore.med>\nSubject: re: consult Thu\nCan we push our 2pm to 3:30pm on Thursday? Room 214. Bring the MRI films.\n— Elena, Neurology, ext 5567",
+    "fields": {"sender_name": "Dr. Elena Vasquez", "sender_email": "e.vasquez@northshore.med", "new_time": "3:30pm", "room": "214"}
+  },
+  {
+    "text": "SHIPPING NOTICE\nTracking 1Z999AA10123456784 (UPS Ground)\nShip to: 88 Marktstrasse, 10405 Berlin, DE\nEst. delivery: 2026-07-09\nWeight 3.2 kg  |  2 parcels",
+    "fields": {"tracking": "1Z999AA10123456784", "carrier": "UPS", "eta": "2026-07-09", "parcels": "2"}
+  },
+  {
+    "text": "Business card scan:\nJONAS OKONKWO\nHead of Growth · Ledgerly\njonas@ledgerly.io  //  +44 20 7946 0102\nLondon, UK",
+    "fields": {"name": "Jonas Okonkwo", "title": "Head of Growth", "company": "Ledgerly", "email": "jonas@ledgerly.io"}
+  },
+  {
+    "text": "Product: UltraGrip Tripod X2\nSKU UG-TRP-X2-BLK  |  In stock: 14\nWas $129.99 — now $89.99 (31% off)\nShips free over $75.",
+    "fields": {"product": "UltraGrip Tripod X2", "sku": "UG-TRP-X2-BLK", "price": "$89.99", "stock": "14"}
+  },
+  {
+    "text": "MEETING CONFIRMED\nZoom call 'Q3 Planning' hosted by Priya Menon\nWed Jul 8, 10:00-11:00 EDT\nLink: https://zoom.us/j/8842217 (passcode 4419)",
+    "fields": {"title": "Q3 Planning", "host": "Priya Menon", "date": "Jul 8", "passcode": "4419"}
+  },
+  {
+    "text": "Lab report #LR-5520\nPatient ID 00-8841  Collected 06/28/2026\nGlucose 104 mg/dL (ref 70-99) HIGH\nHbA1c 5.9%\nReviewed by T. Alvarez, MD",
+    "fields": {"report_no": "LR-5520", "patient_id": "00-8841", "glucose": "104", "reviewer": "T. Alvarez"}
+  },
+  {
+    "text": "Hotel booking — confirmation ABX7742\nGuest: Marco Reyes\nThe Alder Hotel, Portland OR\nCheck-in Aug 2, check-out Aug 5 (3 nights)\nRoom: King Deluxe  Total $612.00",
+    "fields": {"confirmation": "ABX7742", "guest": "Marco Reyes", "nights": "3", "total": "$612.00"}
+  },
+  {
+    "text": "Job posting: Senior Backend Engineer (Remote, EU)\nCompany: Finch Systems\nSalary EUR 85,000-105,000 + equity\nStack: Go, Postgres, Kafka\nApply by 2026-07-31",
+    "fields": {"role": "Senior Backend Engineer", "company": "Finch Systems", "deadline": "2026-07-31", "salary_max": "105,000"}
+  },
+  {
+    "text": "Restaurant reservation\nOsteria Bianca — party of 4\nSat Jul 11 at 7:45 PM under 'Huda'\nNote: one gluten-free, high chair needed.\nTel 212-555-0177",
+    "fields": {"restaurant": "Osteria Bianca", "party_size": "4", "time": "7:45 PM", "phone": "212-555-0177"}
+  },
+  {
+    "text": "Warranty registration\nDevice: Nimbus Air Purifier N300\nSerial NB300-2026-77812\nPurchased 2026-05-19 at BestElectro\nWarranty: 24 months",
+    "fields": {"device": "Nimbus Air Purifier N300", "serial": "NB300-2026-77812", "purchase_date": "2026-05-19", "warranty_months": "24"}
+  },
+  {
+    "text": "Wire transfer advice\nBeneficiary: Sunrise Textiles Ltd\nIBAN GB29 NWBK 6016 1331 9268 19\nAmount: GBP 4,250.00\nReference: INV-3387  Value date 07/06/2026",
+    "fields": {"beneficiary": "Sunrise Textiles Ltd", "amount": "4,250.00", "reference": "INV-3387", "value_date": "07/06/2026"}
+  },
+  {
+    "text": "Event ticket — General Admission\nSynthwave Night @ The Fillmore\nSat, 09 Aug 2026, doors 8:00 PM\nSeat GA-block C  Order #FM-99120  Price $45",
+    "fields": {"event": "Synthwave Night", "venue": "The Fillmore", "order_no": "FM-99120", "price": "$45"}
+  },
+  {
+    "text": "Support ticket #TK-4417 opened by liam.chen@corp.example\nPriority: High\nSubject: VPN drops every ~10 min on macOS\nAssigned to Network team, SLA 4h",
+    "fields": {"ticket_no": "TK-4417", "requester": "liam.chen@corp.example", "priority": "High", "sla": "4h"}
+  }
+]
