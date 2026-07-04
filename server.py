@@ -3,8 +3,21 @@
     set BTL_API_KEY=...    (PowerShell: $env:BTL_API_KEY="...")
     python server.py       -> http://localhost:8000
 """
-import os, json, http.server, socketserver
+import os, sys, json, http.server, socketserver
 import crosscheck as cc
+
+
+def validate_extract(req):
+    """Return an error string for a bad /api/extract body, or None if valid."""
+    if not isinstance(req, dict):
+        return "body must be a JSON object"
+    if not isinstance(req.get("text"), str) or not req["text"].strip():
+        return "field 'text' must be a non-empty string"
+    fs = req.get("fields")
+    if (not isinstance(fs, list) or not fs
+            or not all(isinstance(x, str) and x.strip() for x in fs)):
+        return "field 'fields' must be a non-empty list of strings"
+    return None
 
 PORT = int(os.environ.get("PORT", "8000"))
 HERE = os.path.dirname(__file__)
@@ -143,16 +156,37 @@ class H(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/api/extract":
             return self._send(404, json.dumps({"error": "not found"}))
-        n = int(self.headers.get("Content-Length", 0))
-        req = json.loads(self.rfile.read(n) or b"{}")
+        try:
+            n = int(self.headers.get("Content-Length", 0))
+            req = json.loads(self.rfile.read(n) or b"{}")
+        except (ValueError, json.JSONDecodeError):
+            return self._send(400, json.dumps({"error": "invalid JSON body"}))
+        err = validate_extract(req)
+        if err:
+            return self._send(400, json.dumps({"error": err}))
         try:
             r = cc.crosscheck(req["text"], req["fields"])
             return self._send(200, json.dumps(r))
         except Exception as e:
-            return self._send(200, json.dumps({"error": str(e)}))
+            return self._send(502, json.dumps({"error": str(e)}))
+
+
+def _selfcheck():
+    assert validate_extract({"text": "hi", "fields": ["a"]}) is None
+    assert validate_extract("nope") == "body must be a JSON object"
+    assert "text" in validate_extract({"fields": ["a"]})
+    assert "text" in validate_extract({"text": "  ", "fields": ["a"]})
+    assert "fields" in validate_extract({"text": "hi"})
+    assert "fields" in validate_extract({"text": "hi", "fields": []})
+    assert "fields" in validate_extract({"text": "hi", "fields": "a"})
+    assert "fields" in validate_extract({"text": "hi", "fields": ["a", ""]})
+    print("server self-check OK: input validation")
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "test":
+        _selfcheck()
+        sys.exit(0)
     if not cc.API_KEY:
         print("WARNING: BTL_API_KEY not set — API calls will 401.")
     print(f"Crosscheck dashboard: http://localhost:{PORT}  (Ctrl+C to stop)")

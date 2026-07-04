@@ -259,7 +259,22 @@ def demo():
     except GatewayError as e:
         assert e.status == 400
 
-    print("self-check OK: agreement, judge on disagreement, 5xx failover, 4xx raises")
+    # parser tolerates code fences / prose / garbage
+    assert _parse_json('```json\n{"a": 1}\n```') == {"a": 1}
+    assert _parse_json('Here you go: {"a": 2} done') == {"a": 2}
+    assert _parse_json("not json at all") == {}
+    assert _parse_json("") == {}
+
+    # norm: money/case/space-insensitive, handles None and numbers
+    assert norm(None) == ""
+    assert norm("$1,200.00") == "1200.00"
+    assert norm("  Net 30 ") == "net 30"
+    assert norm("$1,200") == norm("1,200") == norm(1200) == "1200"
+    # ponytail: known ceiling — trailing-zero forms differ ("1200.00" vs float
+    # "1200.0"); the judge resolves these numeric-format disagreements.
+    assert norm("1200.00") != norm(1200.00)
+
+    print("self-check OK: agreement, judge, 5xx failover, 4xx raises, parse_json, norm")
 
 
 if __name__ == "__main__":
