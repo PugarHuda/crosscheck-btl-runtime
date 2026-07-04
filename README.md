@@ -1,5 +1,7 @@
 # Crosscheck — a reliability layer on the BTL runtime
 
+**Visual showcase:** https://claude.ai/code/artifact/9bca3cea-1dfc-49dd-a5c0-15d29b313539 · or open [`showcase.html`](showcase.html) locally.
+
 Single LLM calls fail silently: a model returns a confident, wrong value and you
 never know. Crosscheck sends the **same extraction prompt to two providers in
 parallel through the BTL gateway**, then:
@@ -46,6 +48,7 @@ python server.py                # -> http://localhost:8000
 python crosscheck.py bench                              # accuracy + real cost over the labeled set
 python crosscheck.py cache                              # prove the exact cache: same prompt twice, faster+cheaper 2nd call
 python crosscheck.py extract "INVOICE Acme ... TOTAL $99" vendor total
+cat records.jsonl | python crosscheck.py batch         # verify many records: JSONL in -> verified JSONL out (+flagged fields)
 ```
 
 Pure Python **standard library** — no `pip install`. Requires **Python 3.8+**.

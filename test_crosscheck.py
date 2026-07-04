@@ -274,6 +274,35 @@ class TestCost(unittest.TestCase):
             self.assertIn(k, m)
 
 
+class TestBatch(unittest.TestCase):
+    def test_list_and_dict_fields(self):
+        recs = [{"text": "t", "fields": ["a"]},
+                {"text": "u", "fields": {"b": "x"}}]  # dict -> keys used
+        out = cc.batch(recs, chat_fn=lambda m, x: '{"a": "1", "b": "2"}')
+        self.assertEqual(len(out), 2)
+        self.assertEqual(out[0]["fields"]["a"], "1")
+        self.assertEqual(out[1]["fields"]["b"], "2")
+        self.assertIn("flagged", out[0])
+        self.assertIn("degraded", out[0])
+
+    def test_flagged_on_disagreement(self):
+        def f(m, x):
+            if "disagree on the field" in x[-1]["content"]:
+                return '{"value": "36", "reason": "r"}'
+            return ('{"n": "36"}' if m == cc.MODEL_A else '{"n": "12"}')
+        out = cc.batch([{"text": "q", "fields": ["n"]}], chat_fn=f)
+        self.assertEqual(out[0]["flagged"], ["n"])
+
+    def test_bad_record_isolated(self):
+        def f(m, x):
+            raise cc.GatewayError(400)   # non-retryable -> raises fast
+        out = cc.batch([{"text": "a", "fields": ["x"]},
+                        {"text": "b", "fields": ["y"]}], chat_fn=f)
+        self.assertEqual(len(out), 2)          # both recorded, batch didn't crash
+        self.assertIn("error", out[0])
+        self.assertIn("error", out[1])
+
+
 # ================= INTEGRATION: real HTTP server, mocked gateway =========
 class TestServerIntegration(unittest.TestCase):
     @classmethod

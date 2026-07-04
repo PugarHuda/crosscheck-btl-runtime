@@ -113,9 +113,15 @@ def _timed_chat(model, prompt):
         API_BASE + "/chat/completions", data=body,
         headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"})
     t = time.time()
-    with urllib.request.urlopen(req, timeout=60) as r:
-        h = r.headers
-        payload = json.load(r)
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            h = r.headers
+            payload = json.load(r)
+    except urllib.error.HTTPError as e:
+        raise GatewayError(e.code, e.read().decode("utf-8", "replace"))
+    except (urllib.error.URLError, socket.timeout, TimeoutError,
+            http.client.HTTPException, ConnectionError, OSError) as e:
+        raise GatewayError(599, str(e))
     ms = round((time.time() - t) * 1000)
 
     def num(k):
@@ -300,6 +306,28 @@ def run_benchmark(samples, chat_fn=None, progress=None):
     }
 
 
+def batch(records, chat_fn=None):
+    """Verify a list of {text, fields} records — fields may be a list or a dict
+    (keys are used). Returns one result per record: final values + which fields
+    were flagged for review. Pipe JSONL in, get verified JSONL out."""
+    out = []
+    for rec in records:
+        try:
+            fields = rec["fields"]
+            if isinstance(fields, dict):
+                fields = list(fields.keys())
+            r = crosscheck(rec["text"], fields, chat_fn=chat_fn)
+            out.append({
+                "fields": {f: v["value"] for f, v in r["fields"].items()},
+                "flagged": [f for f, v in r["fields"].items() if v["needs_review"]],
+                "degraded": r["degraded"],
+            })
+        except Exception as e:
+            # one bad record (e.g. a gateway outage) must not sink the whole batch
+            out.append({"error": str(e)})
+    return out
+
+
 def list_models():
     req = urllib.request.Request(API_BASE + "/models",
                                  headers={"Authorization": f"Bearer {API_KEY}"})
@@ -397,9 +425,15 @@ if __name__ == "__main__":
         print(json.dumps({k: v for k, v in m.items() if k != "rows"}, indent=2))
     elif cmd == "cache":
         print(json.dumps(cache_demo(), indent=2))
+    elif cmd == "batch":
+        src = open(sys.argv[2], encoding="utf-8") if len(sys.argv) > 2 else sys.stdin
+        records = [json.loads(ln) for ln in src if ln.strip()]
+        for res in batch(records):
+            print(json.dumps(res))
     elif cmd == "extract":
         text = sys.argv[2]
         fields = sys.argv[3:]
         print(json.dumps(crosscheck(text, fields), indent=2))
     else:
-        print("usage: crosscheck.py [demo|models|bench|cache|extract <text> <f1>...]")
+        print("usage: crosscheck.py [demo|models|bench|cache|batch <file.jsonl>|"
+              "extract <text> <f1>...]")

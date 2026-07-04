@@ -1,0 +1,145 @@
+<title>Crosscheck — reliability layer on the BTL runtime</title>
+<style>
+:root{
+  --ink:#0b0e14; --panel:#141a24; --panel2:#0f151d; --line:#232b38;
+  --text:#e6edf3; --muted:#8b9bb0; --accent:#4c9ffe;
+  --good:#35c07f; --flag:#ff5c57; --warn:#f2b544;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --r:14px;
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --ink:#f7f9fb; --panel:#ffffff; --panel2:#f0f3f7; --line:#dde3ec;
+    --text:#111a26; --muted:#586576; --accent:#1f6feb;
+    --good:#1a7f4b; --flag:#d1242f; --warn:#9a6700;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#0b0e14; --panel:#141a24; --panel2:#0f151d; --line:#232b38;
+  --text:#e6edf3; --muted:#8b9bb0; --accent:#4c9ffe;
+  --good:#35c07f; --flag:#ff5c57; --warn:#f2b544;
+}
+:root[data-theme="light"]{
+  --ink:#f7f9fb; --panel:#ffffff; --panel2:#f0f3f7; --line:#dde3ec;
+  --text:#111a26; --muted:#586576; --accent:#1f6feb;
+  --good:#1a7f4b; --flag:#d1242f; --warn:#9a6700;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--text);font-family:var(--sans);
+  line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:clamp(20px,4vw,44px)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);display:flex;align-items:center;gap:9px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 22%,transparent)}
+h1{font-size:clamp(30px,5.4vw,52px);line-height:1.05;letter-spacing:-.02em;margin:18px 0 0;
+  text-wrap:balance;font-weight:680;max-width:16ch}
+h1 em{font-style:normal;color:var(--accent)}
+.deck{color:var(--muted);font-size:clamp(15px,1.7vw,18px);max-width:56ch;margin:16px 0 0}
+.hero{display:grid;grid-template-columns:1.15fr .85fr;gap:26px;align-items:center;margin-top:26px}
+@media (max-width:760px){.hero{grid-template-columns:1fr;gap:18px}}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.catch{box-shadow:0 20px 50px -30px rgba(0,0,0,.6)}
+.catch .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.doc{font-family:var(--mono);font-size:13px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:9px;padding:10px 12px;margin:8px 0 16px;color:var(--text)}
+.rowline{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:11px 12px;border:1px solid var(--line);border-radius:10px;margin-top:9px;background:var(--panel2)}
+.rowline.bad{border-color:color-mix(in srgb,var(--flag) 45%,var(--line))}
+.rowline.good{border-color:color-mix(in srgb,var(--good) 50%,var(--line))}
+.who{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.val{font-family:var(--mono);font-size:18px;font-variant-numeric:tabular-nums;font-weight:600}
+.val.strike{color:var(--flag);text-decoration:line-through;text-decoration-thickness:2px}
+.val.win{color:var(--good)}
+.pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 9px;border-radius:20px;font-weight:600}
+.pill.flag{color:var(--flag);background:color-mix(in srgb,var(--flag) 15%,transparent)}
+.pill.ok{color:var(--good);background:color-mix(in srgb,var(--good) 15%,transparent)}
+.judge{font-size:12.5px;color:var(--muted);margin-top:11px}
+.judge b{color:var(--accent);font-family:var(--mono)}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:40px 0 0}
+@media (max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 16px}
+.stat b{display:block;font-size:26px;font-weight:680;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.stat.hl b{color:var(--accent)}
+.stat span{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4}
+.stat small{color:var(--good);font-family:var(--mono);font-size:11px}
+
+.sec-h{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);margin:44px 0 14px;display:flex;align-items:center;gap:10px}
+.sec-h::after{content:"";flex:1;height:1px;background:var(--line)}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:760px){.steps{grid-template-columns:1fr}}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.step .n{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600}
+.step h3{margin:8px 0 6px;font-size:15.5px;font-weight:620}
+.step p{margin:0;font-size:13.5px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:9px;margin-top:4px}
+.chip{font-family:var(--mono);font-size:12px;color:var(--text);background:var(--panel);
+  border:1px solid var(--line);border-radius:9px;padding:9px 12px;display:flex;gap:8px;align-items:center}
+.chip i{width:6px;height:6px;border-radius:50%;background:var(--accent);font-style:normal}
+.chip.g i{background:var(--good)} .chip.w i{background:var(--warn)}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+footer a{color:var(--accent);text-decoration:none}
+</style>
+
+<div class="wrap">
+  <div class="eyebrow"><span class="dot"></span>Crosscheck · reliability layer on the BTL runtime</div>
+
+  <div class="hero">
+    <div>
+      <h1>Two models check each other. The cheap one's <em>mistakes get caught.</em></h1>
+      <p class="deck">Send the same extraction prompt to two providers through the BTL multi-provider gateway.
+      Where they agree, auto-accept. Where they disagree, a strong model resolves it and the field is
+      flagged. A cheap model's silent errors stop flowing into your data.</p>
+    </div>
+
+    <div class="card catch">
+      <div class="lbl">Field · total_bottles</div>
+      <div class="doc">"Order: 3 cartons, 12 bottles per carton."</div>
+      <div class="rowline bad">
+        <span class="who">gemma-3-4b · cheap</span>
+        <span><span class="val strike">12</span> <span class="pill flag">flagged</span></span>
+      </div>
+      <div class="rowline good">
+        <span class="who">Crosscheck · resolved</span>
+        <span><span class="val win">36</span> <span class="pill ok">verified</span></span>
+      </div>
+      <div class="judge">Models disagreed → <b>gpt-4.1-mini</b> judged: 3 × 12 = <b>36</b>.</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b>89.7%</b><span>cheap model alone</span></div>
+    <div class="stat hl"><b>~93%</b><span>with Crosscheck<br><small>→ strong: 94.1%</small></span></div>
+    <div class="stat"><b>100%</b><span>flag precision<br>zero false alarms</span></div>
+    <div class="stat"><b>10.3%</b><span>escalated to judge</span></div>
+  </div>
+
+  <div class="sec-h">How it works</div>
+  <div class="steps">
+    <div class="step"><div class="n">01 · fan-out</div><h3>Same prompt, two providers</h3>
+      <p>Every field runs on a cheap model and a strong model in parallel — one OpenAI-compatible gateway.</p></div>
+    <div class="step"><div class="n">02 · compare</div><h3>Agree → accept · disagree → judge</h3>
+      <p>Matching fields are auto-accepted. Disagreements go to a strong judge and are flagged for review.</p></div>
+    <div class="step"><div class="n">03 · fail over</div><h3>A provider drops? Keep going</h3>
+      <p>On a 5xx, 429, or dropped connection the call fails over to the other provider instead of crashing.</p></div>
+  </div>
+
+  <div class="sec-h">Built on the gateway, not around it</div>
+  <div class="chips">
+    <span class="chip"><i></i>Multi-provider fan-out</span>
+    <span class="chip w"><i></i>Cross-provider failover</span>
+    <span class="chip g"><i></i>Live cost — $0.004 / 68-field run</span>
+    <span class="chip g"><i></i>Exact cache — 2199ms → 399ms on repeat</span>
+    <span class="chip"><i></i>OpenAI-compatible /v1/chat/completions</span>
+  </div>
+
+  <footer>
+    <span>Honest by design: it's a verification layer, not a cost saver — both models run; the judge fires on ~10%.</span>
+    <span>BTL Runtime Hackathon · 2026</span>
+  </footer>
+</div>
