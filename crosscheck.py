@@ -312,6 +312,22 @@ def compare(text, fields, models, chat_fn=None):
     return {"models": models, "fields": fields, "rows": rows, "agree": agree}
 
 
+def suggest_fields(text, model=None, chat_fn=None):
+    """Ask a model which fields are worth extracting from `text`. Returns a list
+    of short snake_case field names."""
+    chat_fn = chat_fn or _http_chat
+    sysmsg = ("You propose which fields to extract from a document. Return ONLY "
+              'JSON {"fields": [...]} with 3-8 short snake_case field names '
+              "(strings) that a person would want pulled out. No explanation.")
+    _, content = chat(model or MODEL_A,
+                      [{"role": "system", "content": sysmsg},
+                       {"role": "user", "content": f"Document:\n{text}"}],
+                      fallback=MODEL_B, chat_fn=chat_fn)
+    obj = _parse_json(content)
+    fields = obj.get("fields", []) if isinstance(obj, dict) else []
+    return [str(x).strip() for x in fields if str(x).strip()][:12]
+
+
 def run_benchmark(samples, chat_fn=None, progress=None):
     """Score crosscheck vs each single model on labeled samples.
     Sequential on purpose — the gateway rate-limits (observed 429s)."""
@@ -515,6 +531,17 @@ def api_consensus(req):
         r["cost_usd"] = round(get_cost()["charge"], 6)
         r["ms"] = round((time.time() - t0) * 1000)
         return 200, r
+    except Exception as e:
+        return 502, {"error": str(e)}
+
+
+def api_suggest(req):
+    """(status, body) — propose extraction fields for req['text']."""
+    text = req.get("text")
+    if not isinstance(text, str) or not text.strip():
+        return 400, {"error": "field 'text' must be a non-empty string"}
+    try:
+        return 200, {"fields": suggest_fields(text)}
     except Exception as e:
         return 502, {"error": str(e)}
 

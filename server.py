@@ -111,6 +111,10 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
     <select id=sample aria-label="Choose a sample document"></select>
     <textarea id=text aria-label="Text to extract fields from" placeholder="Paste messy text&hellip;"></textarea>
     <input id=fields aria-label="Fields to extract, comma separated" placeholder="fields, comma separated &mdash; e.g. vendor, invoice_no, total">
+    <div class=row>
+      <button class=alt id=b-suggest onclick=suggestFields()>&#10024; Suggest fields</button>
+      <span class=mini>let a model propose fields from the text above</span>
+    </div>
     <div class=modelrow>
       <label>Model A (reference) <select id=modelA aria-label="Model A"></select></label>
       <label>Model B (cross-check) <select id=modelB aria-label="Model B"></select></label>
@@ -322,6 +326,16 @@ function renderCompare(d){
   h+='</table></div>';
   $('out').innerHTML=h;
 }
+function suggestFields(){
+  const text=$('text').value; if(!text){$('status').textContent='paste text first';return;}
+  const btn=$('b-suggest'); btn.disabled=true; $('status').textContent='suggesting fields…';
+  fetch('/api/suggest',{method:'POST',body:JSON.stringify({text})}).then(r=>r.json()).then(d=>{
+    btn.disabled=false; $('status').textContent='';
+    if(d.error){$('status').textContent='error: '+d.error;return;}
+    $('fields').value=(d.fields||[]).join(', ');
+    $('status').textContent='suggested '+(d.fields||[]).length+' fields ✓';setTimeout(()=>$('status').textContent='',1800);
+  }).catch(e=>{btn.disabled=false;$('status').textContent='error: '+e;});
+}
 </script></body></html>"""
 
 
@@ -359,7 +373,8 @@ class H(http.server.BaseHTTPRequestHandler):
         return self._send(404, json.dumps({"error": "not found"}))
 
     POST_ROUTES = {"/api/extract": "api_extract", "/api/consensus": "api_consensus",
-                   "/api/batch": "api_batch", "/api/compare": "api_compare"}
+                   "/api/batch": "api_batch", "/api/compare": "api_compare",
+                   "/api/suggest": "api_suggest"}
 
     def do_POST(self):
         fn = self.POST_ROUTES.get(self.path)

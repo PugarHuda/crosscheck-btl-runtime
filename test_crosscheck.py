@@ -451,6 +451,16 @@ class TestApiLayer(unittest.TestCase):
                                          "models": ["one"]})[0], 400)
         self.assertEqual(cc.api_compare({"text": "t", "fields": ["a"]})[0], 400)
 
+    def test_suggest_fields(self):
+        with mock.patch.object(cc, "_http_chat",
+                               lambda m, x: '{"fields": ["vendor", "total", "date"]}'):
+            fs = cc.suggest_fields("some invoice text")
+        self.assertEqual(fs, ["vendor", "total", "date"])
+
+    def test_api_suggest_validation(self):
+        self.assertEqual(cc.api_suggest({"text": ""})[0], 400)
+        self.assertEqual(cc.api_suggest({})[0], 400)
+
 
 class TestDeployAssets(unittest.TestCase):
     """Guard the untested deploy glue: serverless functions must at least compile,
