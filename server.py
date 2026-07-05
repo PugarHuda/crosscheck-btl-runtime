@@ -51,6 +51,10 @@ button:hover{filter:brightness(1.08)} button.alt:hover{background:var(--wash)}
 button:disabled{opacity:.45;cursor:progress;filter:none}
 a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.modelrow{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+.modelrow label{flex:1;min-width:168px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);display:flex;flex-direction:column;gap:5px}
+.modelrow select{margin-top:0}
 .summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;
   color:var(--muted);margin:16px 0 6px}
 .summary b{color:var(--text)}
@@ -95,6 +99,10 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
     <select id=sample aria-label="Choose a sample document"></select>
     <textarea id=text aria-label="Text to extract fields from" placeholder="Paste messy text&hellip;"></textarea>
     <input id=fields aria-label="Fields to extract, comma separated" placeholder="fields, comma separated &mdash; e.g. vendor, invoice_no, total">
+    <div class=modelrow>
+      <label>Model A (reference) <select id=modelA aria-label="Model A"></select></label>
+      <label>Model B (cross-check) <select id=modelB aria-label="Model B"></select></label>
+    </div>
     <div class=row>
       <button id=b-run onclick=run()>Run Crosscheck</button>
       <button class=alt id=b-bench onclick=bench()>Run Benchmark</button>
@@ -115,6 +123,10 @@ fetch('/api/health').then(r=>r.json()).then(h=>{
   $('dot').className='dot '+(h.ok?'up':'down');
   $('health').title=h.ok?'gateway reachable':'gateway unavailable — demo replays captured results';
 }).catch(()=>{$('dot').className='dot down';});
+fetch('/api/models').then(r=>r.json()).then(d=>{
+  $('modelA').innerHTML=d.models.map(m=>`<option ${m===d.default_a?'selected':''}>${m}</option>`).join('');
+  $('modelB').innerHTML=d.models.map(m=>`<option ${m===d.default_b?'selected':''}>${m}</option>`).join('');
+}).catch(()=>{});
 fetch('/api/samples').then(r=>r.json()).then(d=>{SAMPLES=d;
   const s=$('sample');
   s.innerHTML='<option value=-1>— pick a sample or paste your own —</option>'+
@@ -132,8 +144,10 @@ function run(){
   const fields=$('fields').value.split(',').map(x=>x.trim()).filter(Boolean);
   if(!text||!fields.length){$('status').textContent='need text + fields';return;}
   try{localStorage.setItem('cc_last',JSON.stringify({text,fields:$('fields').value}));}catch(e){}
+  const mA=$('modelA').value, mB=$('modelB').value, body={text,fields};
+  if(mA&&mB) body.models=[mA,mB];
   setBusy(true,'calling two providers…');$('out').innerHTML='';
-  fetch('/api/extract',{method:'POST',body:JSON.stringify({text,fields})})
+  fetch('/api/extract',{method:'POST',body:JSON.stringify(body)})
    .then(r=>r.json()).then(d=>{setBusy(false);render(d);}).catch(err);
 }
 function render(d){
@@ -235,6 +249,8 @@ class H(http.server.BaseHTTPRequestHandler):
                 return self._send(500, json.dumps({"error": str(e)}))
         if self.path == "/api/health":
             return self._send(200, json.dumps(cc.api_health()))
+        if self.path == "/api/models":
+            return self._send(200, json.dumps(cc.api_models()))
         if self.path == "/api/cache-demo":
             return self._send(200, json.dumps(cc.api_cache()))
         if self.path == "/api/benchmark":

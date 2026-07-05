@@ -210,7 +210,7 @@ def extract(model, fallback, text, fields, chat_fn):
     return served, _parse_json(content)
 
 
-def judge(text, field, a_val, b_val, chat_fn):
+def judge(text, field, a_val, b_val, chat_fn, judge_model=None, fallback=None):
     """Adjudicate one disagreed field. Returns {'value':..., 'reason':...}."""
     user = (f"Two extractors disagree on the field \"{field}\".\n"
             f"Candidate A: {json.dumps(a_val)}\n"
@@ -220,22 +220,25 @@ def judge(text, field, a_val, b_val, chat_fn):
             "exact span from the source, with no extra words, units, or labels. "
             'Return JSON {"value": <that value>, "reason": <one short sentence>}.')
     try:
-        _, content = chat(JUDGE_MODEL,
+        _, content = chat(judge_model or JUDGE_MODEL,
                           [{"role": "system", "content": SYS},
                            {"role": "user", "content": user}],
-                          fallback=MODEL_B, chat_fn=chat_fn)
+                          fallback=fallback or MODEL_B, chat_fn=chat_fn)
         j = _parse_json(content)
         return {"value": j.get("value", a_val), "reason": j.get("reason", "")}
     except GatewayError:
         return {"value": a_val, "reason": "judge unavailable — defaulted to A"}
 
 
-def crosscheck(text, fields, chat_fn=None):
-    """Run both providers, compare per field, judge disagreements."""
+def crosscheck(text, fields, chat_fn=None, models=None, judge_model=None):
+    """Run two providers, compare per field, judge disagreements.
+    `models` = (model_a, model_b); defaults to the configured cheap/strong pair.
+    `judge_model` overrides who adjudicates (defaults to the strong reference)."""
     chat_fn = chat_fn or _http_chat
+    a_model, b_model = models or (MODEL_A, MODEL_B)
     with ThreadPoolExecutor(max_workers=2) as ex:
-        fa = ex.submit(extract, MODEL_A, MODEL_B, text, fields, chat_fn)
-        fb = ex.submit(extract, MODEL_B, MODEL_A, text, fields, chat_fn)
+        fa = ex.submit(extract, a_model, b_model, text, fields, chat_fn)
+        fb = ex.submit(extract, b_model, a_model, text, fields, chat_fn)
         servedA, ra = fa.result()
         servedB, rb = fb.result()
 
@@ -247,12 +250,12 @@ def crosscheck(text, fields, chat_fn=None):
             out[f] = {"value": a, "agree": True, "needs_review": False,
                       "a": a, "b": b, "reason": ""}
         else:
-            j = judge(text, f, a, b, chat_fn)
+            j = judge(text, f, a, b, chat_fn, judge_model=judge_model, fallback=b_model)
             out[f] = {"value": j["value"], "agree": False, "needs_review": True,
                       "a": a, "b": b, "reason": j["reason"]}
     return {"fields": out, "servedA": servedA, "servedB": servedB,
             "degraded": degraded,
-            "failover": servedA != MODEL_A or servedB != MODEL_B}
+            "failover": servedA != a_model or servedB != b_model}
 
 
 def run_benchmark(samples, chat_fn=None, progress=None):
@@ -401,15 +404,37 @@ def api_samples():
              "preview": s["text"].split("\n")[0][:40]} for s in data]
 
 
+CURATED_MODELS = ["gpt-4.1-mini", "gpt-4.1", "gpt-4.1-nano", "gpt-4o-mini",
+                  "deepseek-chat-v3", "deepseek-chat-v3.1", "gemini-2.5-flash-lite",
+                  "gemma-3-4b-it"]
+
+
+def api_models():
+    """Curated pickable models (intersected with what the gateway offers)."""
+    try:
+        ids = {m["id"] for m in list_models().get("data", [])}
+        avail = [m for m in CURATED_MODELS if m in ids]
+    except Exception:
+        avail = []
+    return {"models": avail or list(CURATED_MODELS),
+            "default_a": MODEL_A, "default_b": MODEL_B}
+
+
 def api_extract(req):
-    """(status, body) — validate, run, attach cost/latency, replay on outage."""
+    """(status, body) — validate, run, attach cost/latency, replay on outage.
+    Optional req['models'] = [modelA, modelB] picks the two providers to cross-check."""
     err = validate_extract(req)
     if err:
         return 400, {"error": err}
+    models = req.get("models")
+    if models is not None and (not isinstance(models, list) or len(models) != 2
+            or not all(isinstance(x, str) and x.strip() for x in models)):
+        return 400, {"error": "field 'models' must be [modelA, modelB]"}
     try:
         reset_cost()
         t0 = time.time()
-        r = crosscheck(req["text"], req["fields"])
+        r = crosscheck(req["text"], req["fields"],
+                       models=tuple(models) if models else None)
         r["cost_usd"] = round(get_cost()["charge"], 6)
         r["ms"] = round((time.time() - t0) * 1000)
         return 200, r

@@ -379,6 +379,25 @@ class TestApiLayer(unittest.TestCase):
         with mock.patch.object(cc, "list_models", side_effect=cc.GatewayError(500)):
             self.assertFalse(cc.api_health()["ok"])
 
+    def test_crosscheck_honors_chosen_models(self):
+        r = cc.crosscheck("t", ["a"], chat_fn=lambda m, x: '{"a": "1"}',
+                          models=("model-x", "model-y"))
+        self.assertEqual({r["servedA"], r["servedB"]}, {"model-x", "model-y"})
+
+    def test_extract_rejects_bad_models(self):
+        self.assertEqual(cc.api_extract({"text": "t", "fields": ["a"],
+                                         "models": ["only-one"]})[0], 400)
+        self.assertEqual(cc.api_extract({"text": "t", "fields": ["a"],
+                                         "models": "x"})[0], 400)
+
+    def test_api_models_shape(self):
+        with mock.patch.object(cc, "list_models",
+                               return_value={"data": [{"id": "gpt-4.1-mini"},
+                                                      {"id": "gemma-3-4b-it"}]}):
+            d = cc.api_models()
+        self.assertIn("gpt-4.1-mini", d["models"])
+        self.assertEqual(d["default_a"], cc.MODEL_A)
+
 
 class TestDeployAssets(unittest.TestCase):
     """Guard the untested deploy glue: serverless functions must at least compile,
