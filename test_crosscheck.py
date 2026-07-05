@@ -507,6 +507,26 @@ class TestDeployAssets(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(self.ROOT, f)), f + " missing")
 
 
+class TestDashboardShell(unittest.TestCase):
+    """Guard the sidebar dashboard structure — client-side, not covered by the API tests."""
+    P = server.PAGE
+
+    def test_all_modes_present(self):
+        for m in ("verify", "deep", "compare", "consistency", "batch",
+                  "benchmark", "cache", "api"):
+            self.assertIn("data-m=" + m, self.P)
+
+    def test_mode_machinery_present(self):
+        for x in ("function selectMode", "function runMode", "const MODES",
+                  "secTextFields", "secModels", "secBatch", "secApi"):
+            self.assertIn(x, self.P)
+
+    def test_no_dead_refs(self):
+        for dead in ("b-run", "b-verify", "b-batch", "'benchout'", "'cacheout'",
+                     "'batchout'", ".batchbox", ".toplinks", ".pad{"):
+            self.assertNotIn(dead, self.P)
+
+
 # ================= INTEGRATION: real HTTP server, mocked gateway =========
 class TestServerIntegration(unittest.TestCase):
     @classmethod

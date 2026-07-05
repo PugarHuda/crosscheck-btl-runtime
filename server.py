@@ -40,13 +40,8 @@ body{font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;background:var
 .sidefoot a:hover{color:var(--text)}
 .main{padding:clamp(18px,3vw,30px);min-width:0}
 .modehead{margin-bottom:16px}
-.pad{padding:clamp(18px,3vw,30px)}
-.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
-  padding:14px clamp(18px,3vw,26px);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em;font-size:17px}
 .mark{width:22px;height:22px;flex:none;color:var(--ink)}
-.toplinks{display:flex;align-items:center;gap:16px;font-family:var(--mono);font-size:12px;color:var(--muted)}
-.toplinks a{color:var(--muted);text-decoration:none} .toplinks a:hover{color:var(--text)}
 .dot{width:8px;height:8px;border-radius:50%;background:#b6bdc9;display:inline-block;margin-right:6px;vertical-align:middle}
 .dot.up{background:var(--good);box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 20%,transparent)}
 .dot.down{background:var(--flag);box-shadow:0 0 0 3px color-mix(in srgb,var(--flag) 20%,transparent)}
@@ -71,12 +66,6 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
 .modelrow label{flex:1;min-width:168px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
   text-transform:uppercase;color:var(--muted);display:flex;flex-direction:column;gap:5px}
 .modelrow select{margin-top:0}
-.batchbox{margin-top:18px;border:1px solid var(--line);border-radius:8px;background:var(--wash)}
-.batchbox>summary{font-family:var(--mono);font-size:12px;cursor:pointer;color:var(--muted);padding:12px 14px;list-style:none}
-.batchbox>summary::-webkit-details-marker{display:none}
-.batchbox>summary::before{content:"\25B8 ";color:var(--accent)}
-.batchbox[open]>summary::before{content:"\25BE "}
-.batchbody{padding:0 14px 14px}
 #batchInput{height:86px}
 .scroll{overflow-x:auto;margin-top:10px}
 .btable{border-collapse:collapse;font-size:12px;font-family:var(--mono);min-width:100%}
@@ -193,7 +182,7 @@ const MODES={
 const SEC={verify:['tf','models'],deep:['tf','models'],compare:['tf','models'],consistency:['tf','models'],batch:['models','batch'],benchmark:[],cache:[],api:['tf','models','api']};
 function selectMode(m){
   MODE=m; const md=MODES[m];
-  document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  document.querySelectorAll('.navitem').forEach(b=>{const on=b.dataset.m===m;b.classList.toggle('on',on);if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   $('mtitle').textContent=md.t; $('mdesc').textContent=md.d; $('run').textContent=md.btn;
   const s=SEC[m];
   $('secTextFields').style.display=s.includes('tf')?'':'none';
