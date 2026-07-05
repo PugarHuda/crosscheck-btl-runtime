@@ -82,6 +82,8 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
 .badge{font-size:10px;padding:2px 8px;border-radius:20px;margin-left:8px;font-family:var(--mono);letter-spacing:.04em;text-transform:uppercase}
 .b-ok{background:color-mix(in srgb,var(--good) 13%,transparent);color:var(--good)}
 .b-flag{background:color-mix(in srgb,var(--flag) 13%,transparent);color:var(--flag)}
+.med{border-left-color:#c8890a}
+.b-med{background:color-mix(in srgb,#c8890a 16%,transparent);color:#8a5d05}
 .banner{padding:10px 14px;border-radius:8px;margin:10px 0;font-size:13px;font-family:var(--mono)}
 .warn{background:#fff7e6;border:1px solid #e7b955;color:#7a5310}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:12px 0}
@@ -123,6 +125,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
     </div>
     <div class=row>
       <button id=b-run onclick=run()>Run Crosscheck</button>
+      <button id=b-verify onclick=runVerify()>Deep verify</button>
       <button class=alt id=b-compare onclick=runCompare()>Compare models</button>
       <button class=alt id=b-consistency onclick=runConsistency()>Self-consistency</button>
       <button class=alt id=b-bench onclick=bench()>Run Benchmark</button>
@@ -153,7 +156,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
 <script>
 let SAMPLES=[], LAST=null;
 const $=id=>document.getElementById(id);
-function setBusy(on,msg){['b-run','b-compare','b-consistency','b-bench','b-cache'].forEach(i=>$(i).disabled=on);$('status').textContent=on?(msg||'working…'):'';}
+function setBusy(on,msg){['b-run','b-verify','b-compare','b-consistency','b-bench','b-cache'].forEach(i=>$(i).disabled=on);$('status').textContent=on?(msg||'working…'):'';}
 function err(e){setBusy(false);$('status').textContent='error: '+e;}
 let LASTBATCH=null, LASTCOMPARE=null;
 function dl(name,txt,mime){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:mime||'text/plain'}));a.download=name;a.click();URL.revokeObjectURL(a.href);}
@@ -382,6 +385,30 @@ function genApi(){
   $('apiSnippet').textContent=`curl -s ${location.origin}/api/extract -H "Content-Type: application/json" -d '${shell}'`;
 }
 function copyApi(){navigator.clipboard.writeText($('apiSnippet').textContent).then(()=>{$('status').textContent='copied ✓';setTimeout(()=>$('status').textContent='',1500);});}
+function runVerify(){
+  const text=$('text').value, fields=$('fields').value.split(',').map(x=>x.trim()).filter(Boolean);
+  if(!text||!fields.length){$('status').textContent='need text + fields';return;}
+  const models=[$('modelA').value,$('modelB').value,$('modelC').value].filter(Boolean);
+  if(models.length<2){$('status').textContent='need at least 2 models';return;}
+  setBusy(true,'deep verifying (consensus + self-consistency)…');$('out').innerHTML='';
+  fetch('/api/verify',{method:'POST',body:JSON.stringify({text,fields,models})})
+   .then(r=>r.json()).then(d=>{setBusy(false);renderVerify(d);}).catch(err);
+}
+function renderVerify(d){
+  if(d.error){$('out').innerHTML=`<div class="banner warn">${d.error}</div>`;return;}
+  LAST=d;
+  const cls={high:'ok',medium:'med',low:'flag'}, bcls={high:'b-ok',medium:'b-med',low:'b-flag'};
+  let h=`<div class=summary><span>deep verify &middot; ${d.models.join(' + ')} + ${d.runs}× self-consistency &middot; ${d.ms}ms &middot; $${d.cost_usd}</span> <button class=copy onclick=copyJson()>Copy JSON</button> <button class=copy onclick=dlExtract()>Download</button></div>`;
+  for(const f in d.fields){const x=d.fields[f];
+    const votes=Object.entries(x.votes).map(([m,v])=>`${m}: ${fmt(v)}`).join(' &nbsp;&middot;&nbsp; ');
+    h+=`<div class="card ${cls[x.confidence]||'flag'}">
+      <div class=k>${f}<span class="badge ${bcls[x.confidence]||'b-flag'}">${x.confidence} confidence</span></div>
+      <div class=v>${fmt(x.value)}</div>
+      <div class=mini>cross-model: ${x.cross_model} &middot; self-stability: ${Math.round(x.stability*100)}%</div>
+      <div class=mini>${votes}</div>
+    </div>`;}
+  $('out').innerHTML=h;
+}
 </script></body></html>"""
 
 
@@ -420,7 +447,8 @@ class H(http.server.BaseHTTPRequestHandler):
 
     POST_ROUTES = {"/api/extract": "api_extract", "/api/consensus": "api_consensus",
                    "/api/batch": "api_batch", "/api/compare": "api_compare",
-                   "/api/suggest": "api_suggest", "/api/consistency": "api_consistency"}
+                   "/api/suggest": "api_suggest", "/api/consistency": "api_consistency",
+                   "/api/verify": "api_verify"}
 
     def do_POST(self):
         fn = self.POST_ROUTES.get(self.path)

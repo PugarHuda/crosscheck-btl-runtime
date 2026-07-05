@@ -353,6 +353,27 @@ def consistency(text, fields, model, n=5, chat_fn=None, temperature=0.8):
     return {"fields": out, "model": model, "runs": m}
 
 
+def deepverify(text, fields, models, n=3, chat_fn=None):
+    """Combine both confidence axes: cross-model consensus AND self-consistency of
+    the reference model, into one per-field verdict — high / medium / low."""
+    cons = consensus(text, fields, models, chat_fn=chat_fn)
+    stab = consistency(text, fields, models[0], n=n, chat_fn=chat_fn)
+    out = {}
+    for f in fields:
+        c, s = cons["fields"][f], stab["fields"][f]
+        cross_ok = c["agreement"] == "unanimous"
+        if cross_ok and s["stability"] >= 0.8:
+            conf = "high"
+        elif c["agreement"] == "split" or s["stability"] < 0.5:
+            conf = "low"
+        else:
+            conf = "medium"
+        out[f] = {"value": c["value"], "confidence": conf,
+                  "cross_model": c["agreement"], "stability": s["stability"],
+                  "votes": c["votes"]}
+    return {"fields": out, "models": models, "runs": stab["runs"]}
+
+
 def run_benchmark(samples, chat_fn=None, progress=None):
     """Score crosscheck vs each single model on labeled samples.
     Sequential on purpose — the gateway rate-limits (observed 429s)."""
@@ -553,6 +574,26 @@ def api_consensus(req):
         reset_cost()
         t0 = time.time()
         r = consensus(req["text"], req["fields"], models)
+        r["cost_usd"] = round(get_cost()["charge"], 6)
+        r["ms"] = round((time.time() - t0) * 1000)
+        return 200, r
+    except Exception as e:
+        return 502, {"error": str(e)}
+
+
+def api_verify(req):
+    """(status, body) — deep verify: cross-model + self-consistency -> one verdict."""
+    err = validate_extract(req)
+    if err:
+        return 400, {"error": err}
+    models = req.get("models")
+    if (not isinstance(models, list) or not (2 <= len(models) <= 4)
+            or not all(isinstance(x, str) and x.strip() for x in models)):
+        return 400, {"error": "field 'models' must be a list of 2-4 model ids"}
+    try:
+        reset_cost()
+        t0 = time.time()
+        r = deepverify(req["text"], req["fields"], models)
         r["cost_usd"] = round(get_cost()["charge"], 6)
         r["ms"] = round((time.time() - t0) * 1000)
         return 200, r

@@ -474,6 +474,21 @@ class TestApiLayer(unittest.TestCase):
         self.assertEqual(cc.api_consistency({"text": "t", "fields": ["a"],
                                              "model": "m", "n": 99})[0], 400)  # n range
 
+    def test_deepverify_high_and_low(self):
+        # agree + stable -> high
+        r = cc.deepverify("t", ["a"], ["m1", "m2"], n=3, chat_fn=lambda mo, ms: '{"a": "1"}')
+        self.assertEqual(r["fields"]["a"]["confidence"], "high")
+        # cross-model split -> low
+        def dis(mo, ms):
+            return '{"a": "2"}' if mo == "m2" else '{"a": "1"}'
+        r = cc.deepverify("t", ["a"], ["m1", "m2"], n=3, chat_fn=dis)
+        self.assertEqual(r["fields"]["a"]["confidence"], "low")
+
+    def test_api_verify_validation(self):
+        self.assertEqual(cc.api_verify({"text": "t", "fields": ["a"],
+                                        "models": ["one"]})[0], 400)
+        self.assertEqual(cc.api_verify({"text": "t", "fields": ["a"]})[0], 400)
+
 
 class TestDeployAssets(unittest.TestCase):
     """Guard the untested deploy glue: serverless functions must at least compile,
