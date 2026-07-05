@@ -336,6 +336,50 @@ class TestSnapshot(unittest.TestCase):
             os.unlink(path)
 
 
+class TestApiLayer(unittest.TestCase):
+    """Direct tests for the shared request handlers (used by both server.py and the
+    Vercel serverless functions) — the refactor's single source of truth."""
+    OK_RESULT = {"fields": {"a": {"value": "1", "agree": True, "needs_review": False,
+                                  "a": "1", "b": "1", "reason": ""}},
+                 "servedA": "m", "servedB": "m", "degraded": False, "failover": False}
+
+    def test_extract_rejects_bad_input(self):
+        self.assertEqual(cc.api_extract({"text": ""})[0], 400)
+        self.assertEqual(cc.api_extract({"text": "hi", "fields": []})[0], 400)
+        self.assertEqual(cc.api_extract("nope")[0], 400)
+
+    def test_extract_ok_attaches_cost_and_ms(self):
+        with mock.patch.object(cc, "crosscheck", return_value=dict(self.OK_RESULT)):
+            code, obj = cc.api_extract({"text": "t", "fields": ["a"]})
+        self.assertEqual(code, 200)
+        self.assertIn("cost_usd", obj)
+        self.assertIn("ms", obj)
+
+    def test_extract_replays_on_outage(self):
+        fake = {"extract": {"t": {"fields": {"a": {"value": "c"}}}}}
+        with mock.patch.object(cc, "crosscheck", side_effect=cc.GatewayError(500)), \
+             mock.patch.object(cc, "load_snapshot", return_value=fake):
+            code, obj = cc.api_extract({"text": "t", "fields": ["a"]})
+        self.assertEqual(code, 200)
+        self.assertTrue(obj.get("replay"))
+
+    def test_benchmark_partial_uses_representative_subset(self):
+        allkeys = ('{"vendor":"x","invoice_no":"x","total":"x","terms":"x","merchant":"x",'
+                   '"order_no":"x","amount":"x","card_last4":"x","subtotal":"x",'
+                   '"total_bottles":"x","due_date":"x","seats_left":"x"}')
+        with mock.patch.object(cc, "load_snapshot", return_value={}), \
+             mock.patch.object(cc, "_http_chat", lambda m, x: allkeys):
+            m = cc.api_benchmark(partial=True)
+        self.assertTrue(m.get("partial"))
+        self.assertEqual(m["n_samples"], 6)   # 2 easy + 4 hard
+
+    def test_health_ok_and_down(self):
+        with mock.patch.object(cc, "list_models", return_value={"data": []}):
+            self.assertTrue(cc.api_health()["ok"])
+        with mock.patch.object(cc, "list_models", side_effect=cc.GatewayError(500)):
+            self.assertFalse(cc.api_health()["ok"])
+
+
 class TestDeployAssets(unittest.TestCase):
     """Guard the untested deploy glue: serverless functions must at least compile,
     and the web assets the deploy assembles from must exist."""
