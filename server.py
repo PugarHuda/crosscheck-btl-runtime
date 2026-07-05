@@ -67,6 +67,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
 .btable th,.btable td{border:1px solid var(--line);padding:6px 9px;text-align:left;white-space:nowrap}
 .btable th{background:#fff;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em}
 .btable td.f{background:color-mix(in srgb,var(--flag) 12%,transparent);color:var(--flag);font-weight:600}
+.snippet{background:var(--ink);color:#e8edf6;border-radius:8px;padding:12px 14px;font-family:var(--mono);font-size:12px;line-height:1.5;overflow-x:auto;white-space:pre;margin-top:10px}
 .summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;
   color:var(--muted);margin:16px 0 6px}
 .summary b{color:var(--text)}
@@ -137,6 +138,14 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
         <textarea id=batchInput aria-label="Batch JSONL input"></textarea>
         <div class=row><button class=alt id=b-batch onclick=runBatch()>Run batch</button></div>
         <div id=batchout></div>
+      </div>
+    </details>
+    <details class=batchbox ontoggle="genApi()">
+      <summary>Use Crosscheck as an API (curl)</summary>
+      <div class=batchbody>
+        <p class=mini>POST /api/extract returns verified JSON with a needs_review flag per field &mdash; reflects the text, fields &amp; models above. Same origin, no key needed by the caller.</p>
+        <pre id=apiSnippet class=snippet></pre>
+        <div class=row><button class=alt onclick=genApi()>Refresh</button><button class=copy onclick=copyApi()>Copy</button></div>
       </div>
     </details>
   </div>
@@ -366,6 +375,13 @@ function renderConsistency(d){
     </div>`;}
   $('out').innerHTML=h;
 }
+function genApi(){
+  const text=$('text').value, fields=$('fields').value.split(',').map(x=>x.trim()).filter(Boolean);
+  const mA=$('modelA').value,mB=$('modelB').value,body={text,fields}; if(mA&&mB)body.models=[mA,mB];
+  const shell=JSON.stringify(body).split("'").join(`'"'"'`);
+  $('apiSnippet').textContent=`curl -s ${location.origin}/api/extract -H "Content-Type: application/json" -d '${shell}'`;
+}
+function copyApi(){navigator.clipboard.writeText($('apiSnippet').textContent).then(()=>{$('status').textContent='copied ✓';setTimeout(()=>$('status').textContent='',1500);});}
 </script></body></html>"""
 
 

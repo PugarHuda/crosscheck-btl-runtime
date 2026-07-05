@@ -45,6 +45,7 @@ of the BTL runtime.
 - **Suggest fields** — paste a document and let a model propose the fields worth extracting (snake_case), so you don't need to know the schema up front (`/api/suggest`)
 - **Export** — download any result: verified JSON for a single extraction, or CSV for the batch and compare tables (completes the verify → export workflow)
 - **Self-consistency** — run one model N times at a higher temperature and see how stable each field is — a confidence axis *within* a model, distinct from cross-model disagreement (`/api/consistency`)
+- **Callable API** — the dashboard generates a copy-paste `curl` for `POST /api/extract`; Crosscheck isn't just a UI, it's a verified-extraction API (returns the values plus a per-field `needs_review` flag)
 
 ## Run
 ```bash
