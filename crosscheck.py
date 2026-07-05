@@ -340,7 +340,7 @@ def run_benchmark(samples, chat_fn=None, progress=None):
     }
 
 
-def batch(records, chat_fn=None):
+def batch(records, chat_fn=None, models=None):
     """Verify a list of {text, fields} records — fields may be a list or a dict
     (keys are used). Returns one result per record: final values + which fields
     were flagged for review. Pipe JSONL in, get verified JSONL out."""
@@ -350,7 +350,7 @@ def batch(records, chat_fn=None):
             fields = rec["fields"]
             if isinstance(fields, dict):
                 fields = list(fields.keys())
-            r = crosscheck(rec["text"], fields, chat_fn=chat_fn)
+            r = crosscheck(rec["text"], fields, chat_fn=chat_fn, models=models)
             out.append({
                 "fields": {f: v["value"] for f, v in r["fields"].items()},
                 "flagged": [f for f, v in r["fields"].items() if v["needs_review"]],
@@ -492,6 +492,34 @@ def api_consensus(req):
         r["cost_usd"] = round(get_cost()["charge"], 6)
         r["ms"] = round((time.time() - t0) * 1000)
         return 200, r
+    except Exception as e:
+        return 502, {"error": str(e)}
+
+
+def api_batch(req):
+    """(status, body) — verify up to 12 {text, fields} records at once."""
+    records = req.get("records")
+    if not isinstance(records, list) or not records:
+        return 400, {"error": "field 'records' must be a non-empty list"}
+    if len(records) > 12:
+        return 400, {"error": "batch is capped at 12 records"}
+    for rec in records:
+        if not isinstance(rec, dict) or not isinstance(rec.get("text"), str) or not rec["text"].strip():
+            return 400, {"error": "each record needs a non-empty 'text'"}
+        fs = rec.get("fields")
+        fs = list(fs.keys()) if isinstance(fs, dict) else fs
+        if not isinstance(fs, list) or not fs:
+            return 400, {"error": "each record needs a non-empty 'fields'"}
+    models = req.get("models")
+    if models is not None and (not isinstance(models, list) or len(models) != 2
+            or not all(isinstance(x, str) and x.strip() for x in models)):
+        return 400, {"error": "field 'models' must be [modelA, modelB]"}
+    try:
+        reset_cost()
+        t0 = time.time()
+        results = batch(records, models=tuple(models) if models else None)
+        return 200, {"results": results, "cost_usd": round(get_cost()["charge"], 6),
+                     "ms": round((time.time() - t0) * 1000)}
     except Exception as e:
         return 502, {"error": str(e)}
 

@@ -55,6 +55,18 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
 .modelrow label{flex:1;min-width:168px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
   text-transform:uppercase;color:var(--muted);display:flex;flex-direction:column;gap:5px}
 .modelrow select{margin-top:0}
+.batchbox{margin-top:18px;border:1px solid var(--line);border-radius:8px;background:var(--wash)}
+.batchbox>summary{font-family:var(--mono);font-size:12px;cursor:pointer;color:var(--muted);padding:12px 14px;list-style:none}
+.batchbox>summary::-webkit-details-marker{display:none}
+.batchbox>summary::before{content:"\25B8 ";color:var(--accent)}
+.batchbox[open]>summary::before{content:"\25BE "}
+.batchbody{padding:0 14px 14px}
+#batchInput{height:86px}
+.scroll{overflow-x:auto;margin-top:10px}
+.btable{border-collapse:collapse;font-size:12px;font-family:var(--mono);min-width:100%}
+.btable th,.btable td{border:1px solid var(--line);padding:6px 9px;text-align:left;white-space:nowrap}
+.btable th{background:#fff;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em}
+.btable td.f{background:color-mix(in srgb,var(--flag) 12%,transparent);color:var(--flag);font-weight:600}
 .summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;
   color:var(--muted);margin:16px 0 6px}
 .summary b{color:var(--text)}
@@ -113,6 +125,14 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
     <div id=out></div>
     <div id=benchout></div>
     <div id=cacheout></div>
+    <details class=batchbox>
+      <summary>Batch mode &mdash; verify many records at once (JSONL, one per line)</summary>
+      <div class=batchbody>
+        <textarea id=batchInput aria-label="Batch JSONL input"></textarea>
+        <div class=row><button class=alt id=b-batch onclick=runBatch()>Run batch</button></div>
+        <div id=batchout></div>
+      </div>
+    </details>
   </div>
 </div>
 <script>
@@ -139,6 +159,11 @@ fetch('/api/samples').then(r=>r.json()).then(d=>{SAMPLES=d;
     if(i>=0){s.value=i;$('text').value=d[i].text;$('fields').value=d[i].fields.join(', ');}}
 });
 try{const p=JSON.parse(localStorage.getItem('cc_last')||'null');if(p){$('text').value=p.text||'';$('fields').value=p.fields||'';}}catch(e){}
+$('batchInput').value=[
+ '{"text":"Invoice AC-12 \\u2014 subtotal 200, tax 20, total 220, net 30","fields":["invoice_no","total","terms"]}',
+ '{"text":"Order: 4 boxes of 6 units each","fields":["total_units"]}',
+ '{"text":"Ticket TK-88 priority Low, due in 24h","fields":["ticket_no","priority"]}'
+].join('\\n');
 $('fields').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();run();}});
 $('text').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();run();}});
 function run(){
@@ -252,6 +277,29 @@ function bench(){
     <p class=mini>${m.n_samples} samples${m.partial?' · partial live subset — full 23-sample run is local (python crosscheck.py bench)':''}. Crosscheck runs BOTH models on every field (it's a verification layer, not a cost saver) — the judge only fires on the ~${m.review_burden}% that disagree. Cost is measured live from the gateway's x-btl-customer-charge header. Blind spot (both models share the bias) is reported, not hidden.</p>`;
   }).catch(err);
 }
+function runBatch(){
+  const lines=$('batchInput').value.split('\\n').map(l=>l.trim()).filter(Boolean);
+  let records; try{records=lines.map(l=>JSON.parse(l));}catch(e){$('batchout').innerHTML=`<div class="banner warn">bad JSONL line: ${e}</div>`;return;}
+  const mA=$('modelA').value,mB=$('modelB').value,body={records}; if(mA&&mB)body.models=[mA,mB];
+  const btn=$('b-batch');btn.disabled=true;$('batchout').innerHTML='<p class=mini>verifying '+records.length+' records…</p>';
+  fetch('/api/batch',{method:'POST',body:JSON.stringify(body)}).then(r=>r.json()).then(d=>{
+    btn.disabled=false;
+    if(d.error){$('batchout').innerHTML=`<div class="banner warn">${d.error}</div>`;return;}
+    renderBatch(d);
+  }).catch(e=>{btn.disabled=false;$('batchout').innerHTML=`<div class="banner warn">${e}</div>`;});
+}
+function renderBatch(d){
+  const cols=[...new Set(d.results.flatMap(r=>r.fields?Object.keys(r.fields):[]))];
+  let h=`<p class=mini>${d.results.length} records &middot; ${d.ms}ms &middot; $${d.cost_usd} &middot; flagged cells in red</p>
+    <div class=scroll><table class=btable><tr><th>#</th>${cols.map(c=>`<th>${c}</th>`).join('')}</tr>`;
+  d.results.forEach((r,i)=>{
+    if(r.error){h+=`<tr><td>${i+1}</td><td class=f colspan=${cols.length}>error: ${r.error}</td></tr>`;return;}
+    const flg=new Set(r.flagged||[]);
+    h+=`<tr><td>${i+1}</td>${cols.map(c=>{const v=r.fields[c];return `<td class="${flg.has(c)?'f':''}">${v==null?'':String(v)}</td>`;}).join('')}</tr>`;
+  });
+  h+='</table></div>';
+  $('batchout').innerHTML=h;
+}
 </script></body></html>"""
 
 
@@ -288,16 +336,19 @@ class H(http.server.BaseHTTPRequestHandler):
                 return self._send(200, json.dumps({"error": str(e)}))
         return self._send(404, json.dumps({"error": "not found"}))
 
+    POST_ROUTES = {"/api/extract": "api_extract", "/api/consensus": "api_consensus",
+                   "/api/batch": "api_batch"}
+
     def do_POST(self):
-        if self.path not in ("/api/extract", "/api/consensus"):
+        fn = self.POST_ROUTES.get(self.path)
+        if not fn:
             return self._send(404, json.dumps({"error": "not found"}))
         try:
             n = int(self.headers.get("Content-Length", 0))
             req = json.loads(self.rfile.read(n) or b"{}")
         except (ValueError, json.JSONDecodeError):
             return self._send(400, json.dumps({"error": "invalid JSON body"}))
-        fn = cc.api_consensus if self.path == "/api/consensus" else cc.api_extract
-        code, obj = fn(req)
+        code, obj = getattr(cc, fn)(req)
         return self._send(code, json.dumps(obj))
 
 

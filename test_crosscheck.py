@@ -422,6 +422,20 @@ class TestApiLayer(unittest.TestCase):
                                            "models": ["only-one"]})[0], 400)
         self.assertEqual(cc.api_consensus({"text": "t", "fields": ["a"]})[0], 400)
 
+    def test_api_batch_ok(self):
+        recs = [{"text": "t", "fields": ["a"]}, {"text": "u", "fields": {"b": "x"}}]
+        with mock.patch.object(cc, "_http_chat", lambda m, x: '{"a": "1", "b": "2"}'):
+            code, obj = cc.api_batch({"records": recs})
+        self.assertEqual(code, 200)
+        self.assertEqual(len(obj["results"]), 2)
+        self.assertIn("cost_usd", obj)
+        self.assertEqual(obj["results"][0]["fields"]["a"], "1")
+
+    def test_api_batch_rejects(self):
+        self.assertEqual(cc.api_batch({"records": []})[0], 400)
+        self.assertEqual(cc.api_batch({"records": [{"text": "t"}]})[0], 400)   # no fields
+        self.assertEqual(cc.api_batch({"records": [{"text": "t", "fields": ["a"]}] * 13})[0], 400)
+
 
 class TestDeployAssets(unittest.TestCase):
     """Guard the untested deploy glue: serverless functions must at least compile,

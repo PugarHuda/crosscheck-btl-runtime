@@ -40,6 +40,7 @@ of the BTL runtime.
 - **Exact-cache demo** — the dashboard's "⚡ Demo exact cache" fires the same prompt twice; the second call is a cache hit (measured ~1.5–2.4× faster, `x-btl-saved` > 0) — a live proof of a BTL-flagship feature
 - **Demo resilience** — the gateway is genuinely flaky (frequent 500s). `snapshot` captures real results; if a live call fails during a demo, the dashboard replays the captured real result with a clearly-labeled "↻ Replay" banner, so a live presentation can't die on a transient outage
 - **Model picker + N-model consensus** — cross-check *any two* of the gateway's providers, or add a third for a **majority vote**: per field you get `unanimous` / `majority` / `split` with every model's vote shown. The multi-provider gateway, made interactive (`/api/models`, `/api/consensus`)
+- **Batch mode** — verify a whole dataset at once: paste JSONL records, get a table with flagged cells highlighted and the real per-run cost (`/api/batch`, or `cat records.jsonl | python crosscheck.py batch`)
 
 ## Run
 ```bash
