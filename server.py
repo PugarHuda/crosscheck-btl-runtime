@@ -123,6 +123,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
     <div class=row>
       <button id=b-run onclick=run()>Run Crosscheck</button>
       <button class=alt id=b-compare onclick=runCompare()>Compare models</button>
+      <button class=alt id=b-consistency onclick=runConsistency()>Self-consistency</button>
       <button class=alt id=b-bench onclick=bench()>Run Benchmark</button>
       <button class=alt id=b-cache onclick=cacheDemo()>&#9889; Demo exact cache</button>
       <span id=status class=mini role=status aria-live=polite></span>
@@ -143,7 +144,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
 <script>
 let SAMPLES=[], LAST=null;
 const $=id=>document.getElementById(id);
-function setBusy(on,msg){['b-run','b-compare','b-bench','b-cache'].forEach(i=>$(i).disabled=on);$('status').textContent=on?(msg||'working…'):'';}
+function setBusy(on,msg){['b-run','b-compare','b-consistency','b-bench','b-cache'].forEach(i=>$(i).disabled=on);$('status').textContent=on?(msg||'working…'):'';}
 function err(e){setBusy(false);$('status').textContent='error: '+e;}
 let LASTBATCH=null, LASTCOMPARE=null;
 function dl(name,txt,mime){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:mime||'text/plain'}));a.download=name;a.click();URL.revokeObjectURL(a.href);}
@@ -346,6 +347,25 @@ function suggestFields(){
     $('status').textContent='suggested '+(d.fields||[]).length+' fields ✓';setTimeout(()=>$('status').textContent='',1800);
   }).catch(e=>{btn.disabled=false;$('status').textContent='error: '+e;});
 }
+function runConsistency(){
+  const text=$('text').value, fields=$('fields').value.split(',').map(x=>x.trim()).filter(Boolean);
+  if(!text||!fields.length){$('status').textContent='need text + fields';return;}
+  const model=$('modelA').value||'';
+  setBusy(true,'running the same model 5×…');$('out').innerHTML='';
+  fetch('/api/consistency',{method:'POST',body:JSON.stringify({text,fields,model,n:5})})
+   .then(r=>r.json()).then(d=>{setBusy(false);renderConsistency(d);}).catch(err);
+}
+function renderConsistency(d){
+  if(d.error){$('out').innerHTML=`<div class="banner warn">${d.error}</div>`;return;}
+  let h=`<div class=summary><span>${d.model} &middot; ${d.runs} runs &middot; ${d.ms}ms &middot; $${d.cost_usd} &middot; stability = how often the same value repeats</span></div>`;
+  for(const f in d.fields){const x=d.fields[f];const ok=x.stability>=0.6;const pct=Math.round(x.stability*100);
+    h+=`<div class="card ${ok?'ok':'flag'}">
+      <div class=k>${f}<span class="badge ${ok?'b-ok':'b-flag'}">${pct}% stable</span></div>
+      <div class=v>${fmt(x.value)}</div>
+      <div class=mini>${x.distinct} distinct value${x.distinct===1?'':'s'} across ${x.runs} runs</div>
+    </div>`;}
+  $('out').innerHTML=h;
+}
 </script></body></html>"""
 
 
@@ -384,7 +404,7 @@ class H(http.server.BaseHTTPRequestHandler):
 
     POST_ROUTES = {"/api/extract": "api_extract", "/api/consensus": "api_consensus",
                    "/api/batch": "api_batch", "/api/compare": "api_compare",
-                   "/api/suggest": "api_suggest"}
+                   "/api/suggest": "api_suggest", "/api/consistency": "api_consistency"}
 
     def do_POST(self):
         fn = self.POST_ROUTES.get(self.path)

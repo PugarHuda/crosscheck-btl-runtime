@@ -461,6 +461,19 @@ class TestApiLayer(unittest.TestCase):
         self.assertEqual(cc.api_suggest({"text": ""})[0], 400)
         self.assertEqual(cc.api_suggest({})[0], 400)
 
+    def test_consistency_stability(self):
+        seq = iter(['{"a": "1"}', '{"a": "1"}', '{"a": "2"}', '{"a": "1"}', '{"a": "1"}'])
+        r = cc.consistency("t", ["a"], "m", n=5, chat_fn=lambda mo, ms: next(seq))
+        self.assertEqual(r["runs"], 5)
+        self.assertEqual(cc.norm(r["fields"]["a"]["value"]), "1")
+        self.assertEqual(r["fields"]["a"]["stability"], 0.8)
+        self.assertEqual(r["fields"]["a"]["distinct"], 2)
+
+    def test_api_consistency_validation(self):
+        self.assertEqual(cc.api_consistency({"text": "t", "fields": ["a"]})[0], 400)  # no model
+        self.assertEqual(cc.api_consistency({"text": "t", "fields": ["a"],
+                                             "model": "m", "n": 99})[0], 400)  # n range
+
 
 class TestDeployAssets(unittest.TestCase):
     """Guard the untested deploy glue: serverless functions must at least compile,

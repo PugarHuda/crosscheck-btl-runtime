@@ -328,6 +328,31 @@ def suggest_fields(text, model=None, chat_fn=None):
     return [str(x).strip() for x in fields if str(x).strip()][:12]
 
 
+def consistency(text, fields, model, n=5, chat_fn=None, temperature=0.8):
+    """Self-consistency: run ONE model n times at temperature>0 and measure how
+    stable each field is. High stability = the model is confident; low = uncertain.
+    A different axis from cross-model disagreement."""
+    call = chat_fn or (lambda mo, ms: _http_chat(mo, ms, temperature=temperature))
+    user = "Extract these fields as JSON keys " + json.dumps(fields) + ":\n\n" + text
+    msgs = [{"role": "system", "content": SYS}, {"role": "user", "content": user}]
+    runs = []
+    for _ in range(n):
+        try:
+            runs.append(_parse_json(call(model, msgs)))
+        except GatewayError:
+            pass
+    m = len(runs)
+    out = {}
+    for f in fields:
+        vals = [r.get(f) for r in runs]
+        tally = Counter(norm(v) for v in vals)
+        top_norm, count = tally.most_common(1)[0] if tally else ("", 0)
+        modal = next((v for v in vals if norm(v) == top_norm), None)
+        out[f] = {"value": modal, "stability": round(count / m, 2) if m else 0.0,
+                  "runs": m, "distinct": len(tally)}
+    return {"fields": out, "model": model, "runs": m}
+
+
 def run_benchmark(samples, chat_fn=None, progress=None):
     """Score crosscheck vs each single model on labeled samples.
     Sequential on purpose — the gateway rate-limits (observed 429s)."""
@@ -528,6 +553,28 @@ def api_consensus(req):
         reset_cost()
         t0 = time.time()
         r = consensus(req["text"], req["fields"], models)
+        r["cost_usd"] = round(get_cost()["charge"], 6)
+        r["ms"] = round((time.time() - t0) * 1000)
+        return 200, r
+    except Exception as e:
+        return 502, {"error": str(e)}
+
+
+def api_consistency(req):
+    """(status, body) — run one model req['n'] (2-8) times; per-field stability."""
+    err = validate_extract(req)
+    if err:
+        return 400, {"error": err}
+    model = req.get("model")
+    if not isinstance(model, str) or not model.strip():
+        return 400, {"error": "field 'model' is required"}
+    n = req.get("n", 5)
+    if not isinstance(n, int) or not (2 <= n <= 8):
+        return 400, {"error": "field 'n' must be an integer 2-8"}
+    try:
+        reset_cost()
+        t0 = time.time()
+        r = consistency(req["text"], req["fields"], model, n=n)
         r["cost_usd"] = round(get_cost()["charge"], 6)
         r["ms"] = round((time.time() - t0) * 1000)
         return 200, r

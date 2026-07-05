@@ -44,6 +44,7 @@ of the BTL runtime.
 - **Provider compare** — run the same extraction across your chosen models and see each one's answer, real latency, and real cost side by side (fastest &amp; cheapest starred) to decide which provider to use (`/api/compare`)
 - **Suggest fields** — paste a document and let a model propose the fields worth extracting (snake_case), so you don't need to know the schema up front (`/api/suggest`)
 - **Export** — download any result: verified JSON for a single extraction, or CSV for the batch and compare tables (completes the verify → export workflow)
+- **Self-consistency** — run one model N times at a higher temperature and see how stable each field is — a confidence axis *within* a model, distinct from cross-model disagreement (`/api/consistency`)
 
 ## Run
 ```bash
