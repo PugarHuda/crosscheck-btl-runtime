@@ -23,7 +23,23 @@ PAGE = """<!doctype html><html><head><meta charset=utf-8>
 *{box-sizing:border-box}
 body{font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--ink);
   color:var(--text);margin:0;padding:clamp(6px,1.4vw,14px)}
-.frame{max-width:960px;margin:0 auto;background:var(--paper);border:1px solid var(--ink);border-radius:4px;overflow:hidden}
+.frame{max-width:1080px;margin:0 auto;background:var(--paper);border:1px solid var(--ink);border-radius:4px;overflow:hidden}
+.app{display:grid;grid-template-columns:214px 1fr;min-height:min(80vh,660px)}
+@media (max-width:760px){.app{grid-template-columns:1fr}}
+.side{border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:2px}
+@media (max-width:760px){.side{border-right:0;border-bottom:1px solid var(--line)}}
+.side .brand{padding:4px 8px 10px}
+.side .grp{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:13px 8px 3px}
+.navitem{display:block;width:100%;text-align:left;background:none;border:0;border-radius:7px;padding:8px 10px;
+  font:inherit;font-size:13px;color:var(--text);cursor:pointer;margin:0}
+.navitem:hover{background:var(--wash)}
+.navitem.on{background:var(--ink);color:#fff}
+.sidefoot{margin-top:auto;padding:14px 8px 4px;border-top:1px solid var(--line);margin-top:16px;
+  font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:7px}
+.sidefoot a{color:var(--muted);text-decoration:none}
+.sidefoot a:hover{color:var(--text)}
+.main{padding:clamp(18px,3vw,30px);min-width:0}
+.modehead{margin-bottom:16px}
 .pad{padding:clamp(18px,3vw,30px)}
 .top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
   padding:14px clamp(18px,3vw,26px);border-bottom:1px solid var(--line)}
@@ -97,66 +113,63 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%231f5fff'%3E%3Crect x='2' y='2' width='6' height='6'/%3E%3Crect x='16' y='2' width='6' height='6'/%3E%3Crect x='9' y='9' width='6' height='6'/%3E%3Crect x='2' y='16' width='6' height='6'/%3E%3Crect x='16' y='16' width='6' height='6'/%3E%3C/svg%3E">
 </head><body>
 <div class=frame>
-  <div class=top>
-    <div class=brand>
-      <svg class=mark viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x=2 y=2 width=6 height=6 /><rect x=16 y=2 width=6 height=6 /><rect x=9 y=9 width=6 height=6 /><rect x=2 y=16 width=6 height=6 /><rect x=16 y=16 width=6 height=6 /></svg>
-      crosscheck.
-    </div>
-    <div class=toplinks>
-      <span id=health title="checking gateway…" aria-label="gateway status"><span class=dot id=dot aria-hidden=true></span>gateway</span>
-      <a href="/">&#8592; landing</a>
-      <a href="https://github.com/PugarHuda/crosscheck-btl-runtime">github &#8599;</a>
-    </div>
-  </div>
-  <div class=pad>
-    <h1 class=heroline>Verify every <em>model</em> answer</h1>
-    <p class=sub>Cheap model + strong model, same prompt, in parallel through the BTL gateway. Agree = auto-accept. Disagree = the strong model judges it and flags it. A provider 500s or drops the connection &rarr; fail over.</p>
-    <select id=sample aria-label="Choose a sample document"></select>
-    <textarea id=text aria-label="Text to extract fields from" placeholder="Paste messy text&hellip;"></textarea>
-    <input id=fields aria-label="Fields to extract, comma separated" placeholder="fields, comma separated &mdash; e.g. vendor, invoice_no, total">
-    <div class=row>
-      <button class=alt id=b-suggest onclick=suggestFields()>&#10024; Suggest fields</button>
-      <span class=mini>let a model propose fields from the text above</span>
-    </div>
-    <div class=modelrow>
-      <label>Model A (reference) <select id=modelA aria-label="Model A"></select></label>
-      <label>Model B (cross-check) <select id=modelB aria-label="Model B"></select></label>
-      <label>Model C (optional &mdash; majority vote) <select id=modelC aria-label="Model C (optional)"></select></label>
-    </div>
-    <div class=row>
-      <button id=b-run onclick=run()>Run Crosscheck</button>
-      <button id=b-verify onclick=runVerify()>Deep verify</button>
-      <button class=alt id=b-compare onclick=runCompare()>Compare models</button>
-      <button class=alt id=b-consistency onclick=runConsistency()>Self-consistency</button>
-      <button class=alt id=b-bench onclick=bench()>Run Benchmark</button>
-      <button class=alt id=b-cache onclick=cacheDemo()>&#9889; Demo exact cache</button>
-      <span id=status class=mini role=status aria-live=polite></span>
-    </div>
-    <div id=out></div>
-    <div id=benchout></div>
-    <div id=cacheout></div>
-    <details class=batchbox>
-      <summary>Batch mode &mdash; verify many records at once (JSONL, one per line)</summary>
-      <div class=batchbody>
+  <div class=app>
+    <aside class=side>
+      <div class=brand>
+        <svg class=mark viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x=2 y=2 width=6 height=6 /><rect x=16 y=2 width=6 height=6 /><rect x=9 y=9 width=6 height=6 /><rect x=2 y=16 width=6 height=6 /><rect x=16 y=16 width=6 height=6 /></svg>
+        crosscheck.
+      </div>
+      <div class=grp>Verify</div>
+      <button class=navitem data-m=verify onclick="selectMode('verify')">Cross-check</button>
+      <button class=navitem data-m=deep onclick="selectMode('deep')">Deep verify</button>
+      <div class=grp>Analyze</div>
+      <button class=navitem data-m=compare onclick="selectMode('compare')">Compare models</button>
+      <button class=navitem data-m=consistency onclick="selectMode('consistency')">Self-consistency</button>
+      <div class=grp>Data</div>
+      <button class=navitem data-m=batch onclick="selectMode('batch')">Batch</button>
+      <div class=grp>Gateway</div>
+      <button class=navitem data-m=benchmark onclick="selectMode('benchmark')">Benchmark</button>
+      <button class=navitem data-m=cache onclick="selectMode('cache')">Exact cache</button>
+      <button class=navitem data-m=api onclick="selectMode('api')">Use as API</button>
+      <div class=sidefoot>
+        <span id=health title="checking gateway&hellip;" aria-label="gateway status"><span class=dot id=dot aria-hidden=true></span>gateway</span>
+        <a href="/">&#8592; landing</a>
+        <a href="https://github.com/PugarHuda/crosscheck-btl-runtime">github &#8599;</a>
+      </div>
+    </aside>
+    <main class=main>
+      <div class=modehead><h1 class=heroline id=mtitle>Cross-check</h1><p class=sub id=mdesc></p></div>
+      <div id=secTextFields>
+        <select id=sample aria-label="Choose a sample document"></select>
+        <textarea id=text aria-label="Text to extract fields from" placeholder="Paste messy text&hellip;"></textarea>
+        <input id=fields aria-label="Fields to extract, comma separated" placeholder="fields, comma separated &mdash; e.g. vendor, invoice_no, total">
+        <div class=row>
+          <button class=alt id=b-suggest onclick=suggestFields()>&#10024; Suggest fields</button>
+          <span class=mini>let a model propose fields from the text</span>
+        </div>
+      </div>
+      <div id=secModels class=modelrow>
+        <label>Model A (reference) <select id=modelA aria-label="Model A"></select></label>
+        <label>Model B (cross-check) <select id=modelB aria-label="Model B"></select></label>
+        <label>Model C (optional) <select id=modelC aria-label="Model C (optional)"></select></label>
+      </div>
+      <div id=secBatch style="display:none">
         <textarea id=batchInput aria-label="Batch JSONL input"></textarea>
-        <div class=row><button class=alt id=b-batch onclick=runBatch()>Run batch</button></div>
-        <div id=batchout></div>
       </div>
-    </details>
-    <details class=batchbox ontoggle="genApi()">
-      <summary>Use Crosscheck as an API (curl)</summary>
-      <div class=batchbody>
-        <p class=mini>POST /api/extract returns verified JSON with a needs_review flag per field &mdash; reflects the text, fields &amp; models above. Same origin, no key needed by the caller.</p>
+      <div id=secApi style="display:none">
+        <p class=mini>POST /api/extract returns verified JSON with a needs_review flag per field &mdash; reflects the text, fields &amp; models. Same origin, no key needed by the caller.</p>
         <pre id=apiSnippet class=snippet></pre>
-        <div class=row><button class=alt onclick=genApi()>Refresh</button><button class=copy onclick=copyApi()>Copy</button></div>
+        <div class=row><button class=copy onclick=copyApi()>Copy</button></div>
       </div>
-    </details>
+      <div class=row><button id=run onclick=runMode()>Run cross-check</button><span id=status class=mini role=status aria-live=polite></span></div>
+      <div id=out></div>
+    </main>
   </div>
 </div>
 <script>
 let SAMPLES=[], LAST=null;
 const $=id=>document.getElementById(id);
-function setBusy(on,msg){['b-run','b-verify','b-compare','b-consistency','b-bench','b-cache'].forEach(i=>$(i).disabled=on);$('status').textContent=on?(msg||'working…'):'';}
+function setBusy(on,msg){$('run').disabled=on;$('status').textContent=on?(msg||'working…'):'';}
 function err(e){setBusy(false);$('status').textContent='error: '+e;}
 let LASTBATCH=null, LASTCOMPARE=null;
 function dl(name,txt,mime){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:mime||'text/plain'}));a.download=name;a.click();URL.revokeObjectURL(a.href);}
@@ -166,6 +179,31 @@ function dlBatch(){if(!LASTBATCH)return;const d=LASTBATCH;const cols=[...new Set
   const rows=[['#',...cols,'flagged']];d.results.forEach((r,i)=>{if(r.error){rows.push([i+1,...cols.map(()=>''),'ERROR']);return;}rows.push([i+1,...cols.map(c=>r.fields[c]),(r.flagged||[]).join(' ')]);});dl('batch.csv',csv(rows),'text/csv');}
 function dlCompare(){if(!LASTCOMPARE)return;const d=LASTCOMPARE;const rows=[['provider','latency_ms','cost_usd',...d.fields]];
   d.rows.forEach(r=>{if(r.error){rows.push([r.model,'','ERROR',...d.fields.map(()=>'')]);return;}rows.push([r.served,r.ms,r.cost,...d.fields.map(f=>r.values[f])]);});dl('compare.csv',csv(rows),'text/csv');}
+let MODE='verify';
+const MODES={
+  verify:{t:'Cross-check',d:'Two providers, same prompt. Agree = accept; disagree = the strong model judges it and flags it.',btn:'Run cross-check',run:run},
+  deep:{t:'Deep verify',d:'Combine cross-model consensus AND self-consistency into one high / medium / low verdict per field.',btn:'Deep verify',run:runVerify},
+  compare:{t:'Compare providers',d:'Run the same extraction across your models; compare each answer, latency and real cost.',btn:'Compare',run:runCompare},
+  consistency:{t:'Self-consistency',d:'Run one model (Model A) five times and see how stable each field is.',btn:'Run 5×',run:runConsistency},
+  batch:{t:'Batch',d:'Verify many records at once — one JSON object per line, like {"text": "...", "fields": ["..."]}.',btn:'Run batch',run:runBatch},
+  benchmark:{t:'Benchmark',d:'Accuracy of each model vs Crosscheck, with the real gateway cost.',btn:'Run benchmark',run:bench},
+  cache:{t:'Exact cache',d:'Fire the same prompt twice; the second call is served from the gateway cache — faster and cheaper.',btn:'Demo cache',run:cacheDemo},
+  api:{t:'Use as an API',d:'Crosscheck is a callable verified-extraction API. Copy the request below.',btn:'Refresh snippet',run:genApi}
+};
+const SEC={verify:['tf','models'],deep:['tf','models'],compare:['tf','models'],consistency:['tf','models'],batch:['models','batch'],benchmark:[],cache:[],api:['tf','models','api']};
+function selectMode(m){
+  MODE=m; const md=MODES[m];
+  document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  $('mtitle').textContent=md.t; $('mdesc').textContent=md.d; $('run').textContent=md.btn;
+  const s=SEC[m];
+  $('secTextFields').style.display=s.includes('tf')?'':'none';
+  $('secModels').style.display=s.includes('models')?'':'none';
+  $('secBatch').style.display=s.includes('batch')?'':'none';
+  $('secApi').style.display=s.includes('api')?'':'none';
+  $('out').innerHTML=''; $('status').textContent='';
+  if(m==='api') genApi();
+}
+function runMode(){ MODES[MODE].run(); }
 fetch('/api/health').then(r=>r.json()).then(h=>{
   $('dot').className='dot '+(h.ok?'up':'down');
   $('health').title=h.ok?'gateway reachable':'gateway unavailable — demo replays captured results';
@@ -190,8 +228,9 @@ $('batchInput').value=[
  '{"text":"Order: 4 boxes of 6 units each","fields":["total_units"]}',
  '{"text":"Ticket TK-88 priority Low, due in 24h","fields":["ticket_no","priority"]}'
 ].join('\\n');
-$('fields').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();run();}});
-$('text').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();run();}});
+$('fields').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runMode();}});
+$('text').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();runMode();}});
+selectMode('verify');
 function run(){
   const text=$('text').value;
   const fields=$('fields').value.split(',').map(x=>x.trim()).filter(Boolean);
@@ -261,11 +300,11 @@ function copyJson(){
 }
 function fmt(v){return v==null?'<i>null</i>':String(v);}
 function cacheDemo(){
-  setBusy(true,'firing the same prompt twice…');$('cacheout').innerHTML='';
+  setBusy(true,'firing the same prompt twice…');$('out').innerHTML='';
   fetch('/api/cache-demo').then(r=>r.json()).then(d=>{
     setBusy(false);
-    if(d.error){$('cacheout').innerHTML=`<div class="banner warn">${d.error}</div>`;return;}
-    $('cacheout').innerHTML=`
+    if(d.error){$('out').innerHTML=`<div class="banner warn">${d.error}</div>`;return;}
+    $('out').innerHTML=`
     ${d.replay?'<div class="banner warn">↻ Replay — gateway was unavailable; previously captured real timings.</div>':''}
     <div class=grid>
       <div class=stat><b>${d.cold.ms}ms</b><span>1st call · cold (miss)</span></div>
@@ -277,11 +316,11 @@ function cacheDemo(){
   }).catch(err);
 }
 function bench(){
-  setBusy(true,'benchmarking (this hits the API many times)…');$('benchout').innerHTML='';
+  setBusy(true,'benchmarking (this hits the API many times)…');$('out').innerHTML='';
   fetch('/api/benchmark').then(r=>r.json()).then(m=>{
     setBusy(false);
-    if(m.error){$('benchout').innerHTML=`<div class="banner warn">${m.error}</div>`;return;}
-    $('benchout').innerHTML=`
+    if(m.error){$('out').innerHTML=`<div class="banner warn">${m.error}</div>`;return;}
+    $('out').innerHTML=`
     ${m.replay?'<div class="banner warn">↻ Replay — gateway was unavailable; these are previously captured real numbers.</div>':''}
     <div class=grid>
       <div class=stat><b>${m.acc_b}%</b><span>${m.n_fields} fields · Cheap model alone</span></div>
@@ -305,14 +344,14 @@ function bench(){
 }
 function runBatch(){
   const lines=$('batchInput').value.split('\\n').map(l=>l.trim()).filter(Boolean);
-  let records; try{records=lines.map(l=>JSON.parse(l));}catch(e){$('batchout').innerHTML=`<div class="banner warn">bad JSONL line: ${e}</div>`;return;}
+  let records; try{records=lines.map(l=>JSON.parse(l));}catch(e){$('out').innerHTML=`<div class="banner warn">bad JSONL line: ${e}</div>`;return;}
   const mA=$('modelA').value,mB=$('modelB').value,body={records}; if(mA&&mB)body.models=[mA,mB];
-  const btn=$('b-batch');btn.disabled=true;$('batchout').innerHTML='<p class=mini>verifying '+records.length+' records…</p>';
+  setBusy(true,'verifying '+records.length+' records…');$('out').innerHTML='';
   fetch('/api/batch',{method:'POST',body:JSON.stringify(body)}).then(r=>r.json()).then(d=>{
-    btn.disabled=false;
-    if(d.error){$('batchout').innerHTML=`<div class="banner warn">${d.error}</div>`;return;}
+    setBusy(false);
+    if(d.error){$('out').innerHTML=`<div class="banner warn">${d.error}</div>`;return;}
     renderBatch(d);
-  }).catch(e=>{btn.disabled=false;$('batchout').innerHTML=`<div class="banner warn">${e}</div>`;});
+  }).catch(e=>{btn.disabled=false;$('out').innerHTML=`<div class="banner warn">${e}</div>`;});
 }
 function renderBatch(d){
   LASTBATCH=d;
@@ -325,7 +364,7 @@ function renderBatch(d){
     h+=`<tr><td>${i+1}</td>${cols.map(c=>{const v=r.fields[c];return `<td class="${flg.has(c)?'f':''}">${v==null?'':String(v)}</td>`;}).join('')}</tr>`;
   });
   h+='</table></div>';
-  $('batchout').innerHTML=h;
+  $('out').innerHTML=h;
 }
 function runCompare(){
   const text=$('text').value, fields=$('fields').value.split(',').map(x=>x.trim()).filter(Boolean);

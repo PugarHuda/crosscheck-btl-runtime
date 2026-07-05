@@ -48,10 +48,10 @@ Total ~115s. Record at 1080p, browser zoomed so text is readable. Speak calmly.
 **[0:55–1:15] Failover** *(if a 500 happens naturally, point at the banner; otherwise say this over a normal run)*
 > "The gateway sometimes returns a 500. Instead of crashing, Crosscheck fails over to the other provider automatically — you see the failover banner here. Resilience is built in, which matters on real infrastructure."
 
-**[1:15–1:45] The numbers** *(Run Benchmark → stats appear)*
+**[1:15–1:45] The numbers** *(pick "Benchmark" in the sidebar → stats appear)*
 > "The cheap model alone scores about ninety percent. Crosscheck lifts it toward the strong model — around ninety-three to ninety-four — by catching and fixing its silent errors. Both models run on every field, so this is a verification layer, not a cost trick — but the judge only fires on the ten percent that disagree. And here's the whole run's cost, read live from the gateway's own charge header: about four tenths of a cent. Every flag is a real discrepancy — a hundred percent precision — and I report the blind spot honestly: when both models make the same mistake, cross-checking can't see it."
 
-**[optional, ~12s — high impact] Exact-cache proof** *(click "⚡ Demo exact cache")*
+**[optional, ~12s — high impact] Exact-cache proof** *(pick "Exact cache" in the sidebar, then the run button)*
 > "One more BTL-native thing. I fire the same prompt twice. First call — cold. Second call — served from the gateway's exact cache: faster, and cheaper, with a real saved amount in the header. Cost transparency and caching, for free, from the runtime."
 *(If you include this, trim the failover beat to ~8s to stay under 2:00.)*
 
@@ -64,7 +64,7 @@ Total ~115s. Record at 1080p, browser zoomed so text is readable. Speak calmly.
 - [ ] `python crosscheck.py` → prints "self-check OK"
 - [ ] `$env:BTL_API_KEY` set; `python crosscheck.py models` → confirm `gemma-3-4b-it` + `gpt-4.1-mini` exist; override `BTL_MODEL_B` if needed
 - [ ] `python crosscheck.py bench` once → confirm `acc_final` > `acc_b` (cheap model) — note the real numbers so you can re-say them if the live run stalls
-- [ ] `python server.py`, browser at localhost:8000, zoom to ~125%
+- [ ] open https://crosscheck-btl.vercel.app/app (or `python server.py`); the dashboard is organized by mode in a left sidebar
 - [ ] **When the gateway is healthy, run `python crosscheck.py snapshot`** — captures real cache + the 12→36 catch + benchmark so the dashboard can replay them (labeled) if the gateway 500s mid-demo. (Current snapshot has the catch + cache; top up the benchmark on a good window.)
 - [ ] Do one full dry run of the script end to end before recording
 - [ ] Repo pushed, key NOT committed (it only lives in the env var — good)
