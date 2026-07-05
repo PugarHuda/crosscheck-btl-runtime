@@ -145,6 +145,14 @@ let SAMPLES=[], LAST=null;
 const $=id=>document.getElementById(id);
 function setBusy(on,msg){['b-run','b-compare','b-bench','b-cache'].forEach(i=>$(i).disabled=on);$('status').textContent=on?(msg||'working…'):'';}
 function err(e){setBusy(false);$('status').textContent='error: '+e;}
+let LASTBATCH=null, LASTCOMPARE=null;
+function dl(name,txt,mime){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:mime||'text/plain'}));a.download=name;a.click();URL.revokeObjectURL(a.href);}
+function csv(rows){return rows.map(r=>r.map(c=>{c=(c==null?'':String(c));return /[",\\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;}).join(',')).join('\\n');}
+function dlExtract(){if(!LAST)return;const o={};for(const f in LAST.fields)o[f]=LAST.fields[f].value;dl('crosscheck.json',JSON.stringify(o,null,2),'application/json');}
+function dlBatch(){if(!LASTBATCH)return;const d=LASTBATCH;const cols=[...new Set(d.results.flatMap(r=>r.fields?Object.keys(r.fields):[]))];
+  const rows=[['#',...cols,'flagged']];d.results.forEach((r,i)=>{if(r.error){rows.push([i+1,...cols.map(()=>''),'ERROR']);return;}rows.push([i+1,...cols.map(c=>r.fields[c]),(r.flagged||[]).join(' ')]);});dl('batch.csv',csv(rows),'text/csv');}
+function dlCompare(){if(!LASTCOMPARE)return;const d=LASTCOMPARE;const rows=[['provider','latency_ms','cost_usd',...d.fields]];
+  d.rows.forEach(r=>{if(r.error){rows.push([r.model,'','ERROR',...d.fields.map(()=>'')]);return;}rows.push([r.served,r.ms,r.cost,...d.fields.map(f=>r.values[f])]);});dl('compare.csv',csv(rows),'text/csv');}
 fetch('/api/health').then(r=>r.json()).then(h=>{
   $('dot').className='dot '+(h.ok?'up':'down');
   $('health').title=h.ok?'gateway reachable':'gateway unavailable — demo replays captured results';
@@ -198,7 +206,7 @@ function renderConsensus(d){
     <span><b>${flagged}</b> of ${keys.length} flagged</span>
     <span>· ${d.models.join(' + ')}</span>
     ${d.ms!=null?`<span>· ${d.ms}ms</span>`:''}${d.cost_usd!=null?`<span>· $${d.cost_usd}</span>`:''}
-    <button class=copy onclick=copyJson()>Copy JSON</button></div>`;
+    <button class=copy onclick=copyJson()>Copy JSON</button> <button class=copy onclick=dlExtract()>Download</button></div>`;
   for(const f of keys){const x=d.fields[f];const ok=x.agreement==='unanimous';
     const votes=Object.entries(x.votes).map(([m,v])=>`${m}: <b>${fmt(v)}</b>`).join(' &nbsp;·&nbsp; ');
     h+=`<div class="card ${ok?'ok':'flag'}">
@@ -221,7 +229,7 @@ function render(d){
     <span>· ${d.servedA} + ${d.servedB}</span>
     ${d.ms!=null?`<span>· ${d.ms}ms</span>`:''}
     ${d.cost_usd!=null?`<span>· $${d.cost_usd}</span>`:''}
-    <button class=copy onclick=copyJson()>Copy JSON</button>
+    <button class=copy onclick=copyJson()>Copy JSON</button> <button class=copy onclick=dlExtract()>Download</button>
   </div>`;
   for(const f of keys){const x=d.fields[f];
     h+=`<div class="card ${x.agree?'ok':'flag'}">
@@ -294,8 +302,9 @@ function runBatch(){
   }).catch(e=>{btn.disabled=false;$('batchout').innerHTML=`<div class="banner warn">${e}</div>`;});
 }
 function renderBatch(d){
+  LASTBATCH=d;
   const cols=[...new Set(d.results.flatMap(r=>r.fields?Object.keys(r.fields):[]))];
-  let h=`<p class=mini>${d.results.length} records &middot; ${d.ms}ms &middot; $${d.cost_usd} &middot; flagged cells in red</p>
+  let h=`<div class=summary><span>${d.results.length} records &middot; ${d.ms}ms &middot; $${d.cost_usd} &middot; flagged in red</span><button class=copy onclick=dlBatch()>Download CSV</button></div>
     <div class=scroll><table class=btable><tr><th>#</th>${cols.map(c=>`<th>${c}</th>`).join('')}</tr>`;
   d.results.forEach((r,i)=>{
     if(r.error){h+=`<tr><td>${i+1}</td><td class=f colspan=${cols.length}>error: ${r.error}</td></tr>`;return;}
@@ -315,9 +324,10 @@ function runCompare(){
 }
 function renderCompare(d){
   if(d.error){$('out').innerHTML=`<div class="banner warn">${d.error}</div>`;return;}
+  LASTCOMPARE=d;
   const ok=d.rows.filter(r=>r.values);
   const minMs=ok.length?Math.min(...ok.map(r=>r.ms)):0, minCost=ok.length?Math.min(...ok.map(r=>r.cost)):0;
-  let h=`<p class=mini>compared ${d.models.length} providers &middot; fastest &amp; cheapest &#9733; &middot; disagreeing fields in red</p>
+  let h=`<div class=summary><span>compared ${d.models.length} providers &middot; fastest &amp; cheapest &#9733; &middot; disagreeing in red</span><button class=copy onclick=dlCompare()>Download CSV</button></div>
     <div class=scroll><table class=btable><tr><th>provider</th><th>latency</th><th>cost</th>${d.fields.map(f=>`<th class="${d.agree[f]?'':'f'}">${f}</th>`).join('')}</tr>`;
   d.rows.forEach(r=>{
     if(r.error){h+=`<tr><td>${r.model}</td><td class=f colspan=${d.fields.length+2}>error: ${r.error}</td></tr>`;return;}

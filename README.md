@@ -43,6 +43,7 @@ of the BTL runtime.
 - **Batch mode** — verify a whole dataset at once: paste JSONL records, get a table with flagged cells highlighted and the real per-run cost (`/api/batch`, or `cat records.jsonl | python crosscheck.py batch`)
 - **Provider compare** — run the same extraction across your chosen models and see each one's answer, real latency, and real cost side by side (fastest &amp; cheapest starred) to decide which provider to use (`/api/compare`)
 - **Suggest fields** — paste a document and let a model propose the fields worth extracting (snake_case), so you don't need to know the schema up front (`/api/suggest`)
+- **Export** — download any result: verified JSON for a single extraction, or CSV for the batch and compare tables (completes the verify → export workflow)
 
 ## Run
 ```bash
