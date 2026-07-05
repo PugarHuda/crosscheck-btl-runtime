@@ -398,6 +398,30 @@ class TestApiLayer(unittest.TestCase):
         self.assertIn("gpt-4.1-mini", d["models"])
         self.assertEqual(d["default_a"], cc.MODEL_A)
 
+    def test_consensus_unanimous(self):
+        r = cc.consensus("t", ["a"], ["m1", "m2", "m3"], chat_fn=lambda m, x: '{"a": "1"}')
+        self.assertEqual(r["fields"]["a"]["agreement"], "unanimous")
+        self.assertFalse(r["fields"]["a"]["needs_review"])
+
+    def test_consensus_majority(self):
+        def maj(m, x):
+            return '{"a": "2"}' if m == "m3" else '{"a": "1"}'
+        r = cc.consensus("t", ["a"], ["m1", "m2", "m3"], chat_fn=maj)
+        self.assertEqual(r["fields"]["a"]["agreement"], "majority")
+        self.assertEqual(cc.norm(r["fields"]["a"]["value"]), "1")
+        self.assertTrue(r["fields"]["a"]["needs_review"])
+
+    def test_consensus_split(self):
+        vals = {"m1": '{"a": "1"}', "m2": '{"a": "2"}', "m3": '{"a": "3"}'}
+        r = cc.consensus("t", ["a"], ["m1", "m2", "m3"], chat_fn=lambda m, x: vals[m])
+        self.assertEqual(r["fields"]["a"]["agreement"], "split")
+        self.assertTrue(r["fields"]["a"]["needs_review"])
+
+    def test_api_consensus_validation(self):
+        self.assertEqual(cc.api_consensus({"text": "t", "fields": ["a"],
+                                           "models": ["only-one"]})[0], 400)
+        self.assertEqual(cc.api_consensus({"text": "t", "fields": ["a"]})[0], 400)
+
 
 class TestDeployAssets(unittest.TestCase):
     """Guard the untested deploy glue: serverless functions must at least compile,

@@ -102,6 +102,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
     <div class=modelrow>
       <label>Model A (reference) <select id=modelA aria-label="Model A"></select></label>
       <label>Model B (cross-check) <select id=modelB aria-label="Model B"></select></label>
+      <label>Model C (optional &mdash; majority vote) <select id=modelC aria-label="Model C (optional)"></select></label>
     </div>
     <div class=row>
       <button id=b-run onclick=run()>Run Crosscheck</button>
@@ -126,6 +127,7 @@ fetch('/api/health').then(r=>r.json()).then(h=>{
 fetch('/api/models').then(r=>r.json()).then(d=>{
   $('modelA').innerHTML=d.models.map(m=>`<option ${m===d.default_a?'selected':''}>${m}</option>`).join('');
   $('modelB').innerHTML=d.models.map(m=>`<option ${m===d.default_b?'selected':''}>${m}</option>`).join('');
+  $('modelC').innerHTML='<option value="">— none —</option>'+d.models.map(m=>`<option>${m}</option>`).join('');
 }).catch(()=>{});
 fetch('/api/samples').then(r=>r.json()).then(d=>{SAMPLES=d;
   const s=$('sample');
@@ -144,11 +146,37 @@ function run(){
   const fields=$('fields').value.split(',').map(x=>x.trim()).filter(Boolean);
   if(!text||!fields.length){$('status').textContent='need text + fields';return;}
   try{localStorage.setItem('cc_last',JSON.stringify({text,fields:$('fields').value}));}catch(e){}
-  const mA=$('modelA').value, mB=$('modelB').value, body={text,fields};
-  if(mA&&mB) body.models=[mA,mB];
-  setBusy(true,'calling two providers…');$('out').innerHTML='';
+  const mA=$('modelA').value, mB=$('modelB').value, mC=$('modelC').value;
+  $('out').innerHTML='';
+  if(mC){
+    const models=[mA,mB,mC].filter(Boolean);
+    setBusy(true,'polling '+models.length+' providers…');
+    fetch('/api/consensus',{method:'POST',body:JSON.stringify({text,fields,models})})
+     .then(r=>r.json()).then(d=>{setBusy(false);renderConsensus(d);}).catch(err);
+    return;
+  }
+  const body={text,fields}; if(mA&&mB) body.models=[mA,mB];
+  setBusy(true,'calling two providers…');
   fetch('/api/extract',{method:'POST',body:JSON.stringify(body)})
    .then(r=>r.json()).then(d=>{setBusy(false);render(d);}).catch(err);
+}
+function renderConsensus(d){
+  if(d.error){$('out').innerHTML=`<div class="banner warn">gateway error: ${d.error}</div>`;return;}
+  LAST=d;
+  const keys=Object.keys(d.fields), flagged=keys.filter(f=>d.fields[f].needs_review).length;
+  let h=`<div class=summary>
+    <span><b>${flagged}</b> of ${keys.length} flagged</span>
+    <span>· ${d.models.join(' + ')}</span>
+    ${d.ms!=null?`<span>· ${d.ms}ms</span>`:''}${d.cost_usd!=null?`<span>· $${d.cost_usd}</span>`:''}
+    <button class=copy onclick=copyJson()>Copy JSON</button></div>`;
+  for(const f of keys){const x=d.fields[f];const ok=x.agreement==='unanimous';
+    const votes=Object.entries(x.votes).map(([m,v])=>`${m}: <b>${fmt(v)}</b>`).join(' &nbsp;·&nbsp; ');
+    h+=`<div class="card ${ok?'ok':'flag'}">
+      <div class=k>${f}<span class="badge ${ok?'b-ok':'b-flag'}">${x.agreement}</span></div>
+      <div class=v>${fmt(x.value)}</div>
+      <div class=mini>${votes}</div>
+    </div>`;}
+  $('out').innerHTML=h;
 }
 function render(d){
   let h='';
@@ -261,14 +289,15 @@ class H(http.server.BaseHTTPRequestHandler):
         return self._send(404, json.dumps({"error": "not found"}))
 
     def do_POST(self):
-        if self.path != "/api/extract":
+        if self.path not in ("/api/extract", "/api/consensus"):
             return self._send(404, json.dumps({"error": "not found"}))
         try:
             n = int(self.headers.get("Content-Length", 0))
             req = json.loads(self.rfile.read(n) or b"{}")
         except (ValueError, json.JSONDecodeError):
             return self._send(400, json.dumps({"error": "invalid JSON body"}))
-        code, obj = cc.api_extract(req)
+        fn = cc.api_consensus if self.path == "/api/consensus" else cc.api_extract
+        code, obj = fn(req)
         return self._send(code, json.dumps(obj))
 
 

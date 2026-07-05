@@ -10,6 +10,7 @@ self-check (no API key needed).
 """
 import os, re, json, socket, time, http.client, threading
 import urllib.request, urllib.error
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
 API_BASE = os.environ.get("BTL_API_BASE", "https://api.badtheorylabs.com/v1")
@@ -258,6 +259,36 @@ def crosscheck(text, fields, chat_fn=None, models=None, judge_model=None):
             "failover": servedA != a_model or servedB != b_model}
 
 
+def consensus(text, fields, models, chat_fn=None, judge_model=None):
+    """N-model majority vote (N>=2). Per field: unanimous -> accept; a majority
+    -> accept the majority value but flag the dissent; no majority -> flag as a
+    split for a human. Each model's vote is returned for transparency."""
+    chat_fn = chat_fn or _http_chat
+    n = len(models)
+    with ThreadPoolExecutor(max_workers=min(n, 8)) as ex:
+        futs = {i: ex.submit(extract, m, models[(i + 1) % n], text, fields, chat_fn)
+                for i, m in enumerate(models)}
+        served = {i: futs[i].result() for i in futs}   # i -> (served_model, result)
+
+    out = {}
+    for f in fields:
+        votes = {models[i]: served[i][1].get(f) for i in range(n)}
+        tally = Counter(norm(v) for v in votes.values())
+        top_norm, count = tally.most_common(1)[0]
+        top_val = next(v for v in votes.values() if norm(v) == top_norm)
+        if count == n:
+            out[f] = {"value": top_val, "needs_review": False,
+                      "agreement": "unanimous", "votes": votes}
+        elif count > n / 2:
+            out[f] = {"value": top_val, "needs_review": True,
+                      "agreement": "majority", "votes": votes}
+        else:
+            out[f] = {"value": top_val, "needs_review": True,
+                      "agreement": "split", "votes": votes}
+    return {"fields": out, "models": models,
+            "served": {models[i]: served[i][0] for i in range(n)}}
+
+
 def run_benchmark(samples, chat_fn=None, progress=None):
     """Score crosscheck vs each single model on labeled samples.
     Sequential on purpose — the gateway rate-limits (observed 429s)."""
@@ -442,6 +473,26 @@ def api_extract(req):
         snap = load_snapshot().get("extract", {}).get(req["text"].strip().lower())
         if snap and all(f in snap.get("fields", {}) for f in req["fields"]):
             return 200, {**snap, "replay": True}
+        return 502, {"error": str(e)}
+
+
+def api_consensus(req):
+    """(status, body) — N-model majority vote. req['models'] = 2-4 model ids."""
+    err = validate_extract(req)
+    if err:
+        return 400, {"error": err}
+    models = req.get("models")
+    if (not isinstance(models, list) or not (2 <= len(models) <= 4)
+            or not all(isinstance(x, str) and x.strip() for x in models)):
+        return 400, {"error": "field 'models' must be a list of 2-4 model ids"}
+    try:
+        reset_cost()
+        t0 = time.time()
+        r = consensus(req["text"], req["fields"], models)
+        r["cost_usd"] = round(get_cost()["charge"], 6)
+        r["ms"] = round((time.time() - t0) * 1000)
+        return 200, r
+    except Exception as e:
         return 502, {"error": str(e)}
 
 

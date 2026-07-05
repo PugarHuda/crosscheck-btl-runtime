@@ -39,6 +39,7 @@ of the BTL runtime.
 - **Savings headers** — `x-btl-customer-charge` / `x-btl-saved` / `x-btl-cache-tier` read off each response to show real per-run cost and cache savings
 - **Exact-cache demo** — the dashboard's "⚡ Demo exact cache" fires the same prompt twice; the second call is a cache hit (measured ~1.5–2.4× faster, `x-btl-saved` > 0) — a live proof of a BTL-flagship feature
 - **Demo resilience** — the gateway is genuinely flaky (frequent 500s). `snapshot` captures real results; if a live call fails during a demo, the dashboard replays the captured real result with a clearly-labeled "↻ Replay" banner, so a live presentation can't die on a transient outage
+- **Model picker + N-model consensus** — cross-check *any two* of the gateway's providers, or add a third for a **majority vote**: per field you get `unanimous` / `majority` / `split` with every model's vote shown. The multi-provider gateway, made interactive (`/api/models`, `/api/consensus`)
 
 ## Run
 ```bash
