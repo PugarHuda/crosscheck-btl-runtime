@@ -289,6 +289,29 @@ def consensus(text, fields, models, chat_fn=None, judge_model=None):
             "served": {models[i]: served[i][0] for i in range(n)}}
 
 
+def compare(text, fields, models, chat_fn=None):
+    """Run the same extraction on each model and report per-model latency + real
+    cost + values, so you can see which provider to use. Sequential so each call's
+    cost is attributed cleanly (the cost meter is global)."""
+    chat_fn = chat_fn or _http_chat
+    n = len(models)
+    rows = []
+    for i, m in enumerate(models):
+        reset_cost()
+        t0 = time.time()
+        try:
+            served, res = extract(m, models[(i + 1) % n], text, fields, chat_fn)
+            rows.append({"model": m, "served": served,
+                         "ms": round((time.time() - t0) * 1000),
+                         "cost": round(get_cost()["charge"], 6),
+                         "values": {f: res.get(f) for f in fields}})
+        except Exception as e:
+            rows.append({"model": m, "error": str(e)})
+    ok = [r for r in rows if "values" in r]
+    agree = {f: len({norm(r["values"][f]) for r in ok}) <= 1 for f in fields} if ok else {}
+    return {"models": models, "fields": fields, "rows": rows, "agree": agree}
+
+
 def run_benchmark(samples, chat_fn=None, progress=None):
     """Score crosscheck vs each single model on labeled samples.
     Sequential on purpose — the gateway rate-limits (observed 429s)."""
@@ -490,6 +513,24 @@ def api_consensus(req):
         t0 = time.time()
         r = consensus(req["text"], req["fields"], models)
         r["cost_usd"] = round(get_cost()["charge"], 6)
+        r["ms"] = round((time.time() - t0) * 1000)
+        return 200, r
+    except Exception as e:
+        return 502, {"error": str(e)}
+
+
+def api_compare(req):
+    """(status, body) — run the same extraction across 2-4 models; per-model metrics."""
+    err = validate_extract(req)
+    if err:
+        return 400, {"error": err}
+    models = req.get("models")
+    if (not isinstance(models, list) or not (2 <= len(models) <= 4)
+            or not all(isinstance(x, str) and x.strip() for x in models)):
+        return 400, {"error": "field 'models' must be a list of 2-4 model ids"}
+    try:
+        t0 = time.time()
+        r = compare(req["text"], req["fields"], models)
         r["ms"] = round((time.time() - t0) * 1000)
         return 200, r
     except Exception as e:

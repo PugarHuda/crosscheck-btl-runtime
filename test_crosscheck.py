@@ -436,6 +436,21 @@ class TestApiLayer(unittest.TestCase):
         self.assertEqual(cc.api_batch({"records": [{"text": "t"}]})[0], 400)   # no fields
         self.assertEqual(cc.api_batch({"records": [{"text": "t", "fields": ["a"]}] * 13})[0], 400)
 
+    def test_compare_reports_per_model_metrics(self):
+        vals = {"m1": '{"a": "1"}', "m2": '{"a": "2"}'}
+        r = cc.compare("t", ["a"], ["m1", "m2"], chat_fn=lambda m, x: vals[m])
+        self.assertEqual(len(r["rows"]), 2)
+        self.assertFalse(r["agree"]["a"])           # the two models disagree
+        for row in r["rows"]:
+            self.assertIn("ms", row)
+            self.assertIn("cost", row)
+            self.assertIn("values", row)
+
+    def test_api_compare_validation(self):
+        self.assertEqual(cc.api_compare({"text": "t", "fields": ["a"],
+                                         "models": ["one"]})[0], 400)
+        self.assertEqual(cc.api_compare({"text": "t", "fields": ["a"]})[0], 400)
+
 
 class TestDeployAssets(unittest.TestCase):
     """Guard the untested deploy glue: serverless functions must at least compile,

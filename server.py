@@ -118,6 +118,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
     </div>
     <div class=row>
       <button id=b-run onclick=run()>Run Crosscheck</button>
+      <button class=alt id=b-compare onclick=runCompare()>Compare models</button>
       <button class=alt id=b-bench onclick=bench()>Run Benchmark</button>
       <button class=alt id=b-cache onclick=cacheDemo()>&#9889; Demo exact cache</button>
       <span id=status class=mini role=status aria-live=polite></span>
@@ -138,7 +139,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
 <script>
 let SAMPLES=[], LAST=null;
 const $=id=>document.getElementById(id);
-function setBusy(on,msg){['b-run','b-bench','b-cache'].forEach(i=>$(i).disabled=on);$('status').textContent=on?(msg||'working…'):'';}
+function setBusy(on,msg){['b-run','b-compare','b-bench','b-cache'].forEach(i=>$(i).disabled=on);$('status').textContent=on?(msg||'working…'):'';}
 function err(e){setBusy(false);$('status').textContent='error: '+e;}
 fetch('/api/health').then(r=>r.json()).then(h=>{
   $('dot').className='dot '+(h.ok?'up':'down');
@@ -300,6 +301,27 @@ function renderBatch(d){
   h+='</table></div>';
   $('batchout').innerHTML=h;
 }
+function runCompare(){
+  const text=$('text').value, fields=$('fields').value.split(',').map(x=>x.trim()).filter(Boolean);
+  if(!text||!fields.length){$('status').textContent='need text + fields';return;}
+  const models=[$('modelA').value,$('modelB').value,$('modelC').value].filter(Boolean);
+  setBusy(true,'comparing '+models.length+' providers…');$('out').innerHTML='';
+  fetch('/api/compare',{method:'POST',body:JSON.stringify({text,fields,models})})
+   .then(r=>r.json()).then(d=>{setBusy(false);renderCompare(d);}).catch(err);
+}
+function renderCompare(d){
+  if(d.error){$('out').innerHTML=`<div class="banner warn">${d.error}</div>`;return;}
+  const ok=d.rows.filter(r=>r.values);
+  const minMs=ok.length?Math.min(...ok.map(r=>r.ms)):0, minCost=ok.length?Math.min(...ok.map(r=>r.cost)):0;
+  let h=`<p class=mini>compared ${d.models.length} providers &middot; fastest &amp; cheapest &#9733; &middot; disagreeing fields in red</p>
+    <div class=scroll><table class=btable><tr><th>provider</th><th>latency</th><th>cost</th>${d.fields.map(f=>`<th class="${d.agree[f]?'':'f'}">${f}</th>`).join('')}</tr>`;
+  d.rows.forEach(r=>{
+    if(r.error){h+=`<tr><td>${r.model}</td><td class=f colspan=${d.fields.length+2}>error: ${r.error}</td></tr>`;return;}
+    h+=`<tr><td>${r.served}</td><td>${r.ms}ms${r.ms===minMs?' &#9733;':''}</td><td>$${r.cost}${r.cost===minCost?' &#9733;':''}</td>${d.fields.map(f=>`<td class="${d.agree[f]?'':'f'}">${r.values[f]==null?'':String(r.values[f])}</td>`).join('')}</tr>`;
+  });
+  h+='</table></div>';
+  $('out').innerHTML=h;
+}
 </script></body></html>"""
 
 
@@ -337,7 +359,7 @@ class H(http.server.BaseHTTPRequestHandler):
         return self._send(404, json.dumps({"error": "not found"}))
 
     POST_ROUTES = {"/api/extract": "api_extract", "/api/consensus": "api_consensus",
-                   "/api/batch": "api_batch"}
+                   "/api/batch": "api_batch", "/api/compare": "api_compare"}
 
     def do_POST(self):
         fn = self.POST_ROUTES.get(self.path)
