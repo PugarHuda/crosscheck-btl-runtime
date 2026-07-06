@@ -21,13 +21,14 @@ PAGE = """<!doctype html><html><head><meta charset=utf-8>
   --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
   --serif:Georgia,"Times New Roman",serif}
 *{box-sizing:border-box}
-body{font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--ink);
-  color:var(--text);margin:0;padding:clamp(6px,1.4vw,14px)}
-.frame{max-width:1080px;margin:0 auto;background:var(--paper);border:1px solid var(--ink);border-radius:4px;overflow:hidden}
-.app{display:grid;grid-template-columns:214px 1fr;min-height:min(80vh,660px)}
+body{font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--paper);
+  color:var(--text);margin:0;padding:0}
+.frame{background:var(--paper);overflow:hidden}
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
 @media (max-width:760px){.app{grid-template-columns:1fr}}
-.side{border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:2px}
-@media (max-width:760px){.side{border-right:0;border-bottom:1px solid var(--line)}}
+.side{border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:2px;
+  position:sticky;top:0;height:100vh;align-self:start;overflow-y:auto;background:var(--paper)}
+@media (max-width:760px){.side{border-right:0;border-bottom:1px solid var(--line);position:static;height:auto}}
 .side .brand{padding:4px 8px 10px}
 .side .grp{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:13px 8px 3px}
 .navitem{display:block;width:100%;text-align:left;background:none;border:0;border-radius:7px;padding:8px 10px;

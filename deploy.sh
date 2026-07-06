@@ -20,5 +20,9 @@ echo "assembled .deploy/ — app.html OK ($n endpoints)"
 [ "${1:-}" = "--dry" ] && { echo "dry run, not deploying"; exit 0; }
 
 cd .deploy
+# .deploy/ is rebuilt fresh each run, so re-link it to the existing project every
+# time (else --yes would spin up a NEW project at the wrong URL).
+vercel link --yes --project crosscheck-btl
+# BTL_API_KEY already lives in the project's env from the first deploy; reused.
 # first time only: vercel env add BTL_API_KEY production   (paste your scoped key)
 vercel deploy --prod --yes
