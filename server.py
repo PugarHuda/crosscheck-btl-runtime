@@ -340,7 +340,7 @@ function runBatch(){
     setBusy(false);
     if(d.error){$('out').innerHTML=`<div class="banner warn">${d.error}</div>`;return;}
     renderBatch(d);
-  }).catch(e=>{btn.disabled=false;$('out').innerHTML=`<div class="banner warn">${e}</div>`;});
+  }).catch(e=>{setBusy(false);$('out').innerHTML=`<div class="banner warn">${e}</div>`;});
 }
 function renderBatch(d){
   LASTBATCH=d;
@@ -350,7 +350,7 @@ function renderBatch(d){
   d.results.forEach((r,i)=>{
     if(r.error){h+=`<tr><td>${i+1}</td><td class=f colspan=${cols.length}>error: ${r.error}</td></tr>`;return;}
     const flg=new Set(r.flagged||[]);
-    h+=`<tr><td>${i+1}</td>${cols.map(c=>{const v=r.fields[c];return `<td class="${flg.has(c)?'f':''}">${v==null?'':String(v)}</td>`;}).join('')}</tr>`;
+    h+=`<tr><td>${i+1}</td>${cols.map(c=>{const v=r.fields[c],fl=flg.has(c);return `<td class="${fl?'f':''}"${fl?' title="flagged: models disagree">⚑ ':'>'}${v==null?'':String(v)}</td>`;}).join('')}</tr>`;
   });
   h+='</table></div>';
   $('out').innerHTML=h;
@@ -369,10 +369,10 @@ function renderCompare(d){
   const ok=d.rows.filter(r=>r.values);
   const minMs=ok.length?Math.min(...ok.map(r=>r.ms)):0, minCost=ok.length?Math.min(...ok.map(r=>r.cost)):0;
   let h=`<div class=summary><span>compared ${d.models.length} providers &middot; fastest &amp; cheapest &#9733; &middot; disagreeing in red</span><button class=copy onclick=dlCompare()>Download CSV</button></div>
-    <div class=scroll><table class=btable><tr><th>provider</th><th>latency</th><th>cost</th>${d.fields.map(f=>`<th class="${d.agree[f]?'':'f'}">${f}</th>`).join('')}</tr>`;
+    <div class=scroll><table class=btable><tr><th>provider</th><th>latency</th><th>cost</th>${d.fields.map(f=>`<th class="${d.agree[f]?'':'f'}">${d.agree[f]?'':'⚑ '}${f}</th>`).join('')}</tr>`;
   d.rows.forEach(r=>{
     if(r.error){h+=`<tr><td>${r.model}</td><td class=f colspan=${d.fields.length+2}>error: ${r.error}</td></tr>`;return;}
-    h+=`<tr><td>${r.served}</td><td>${r.ms}ms${r.ms===minMs?' &#9733;':''}</td><td>$${r.cost}${r.cost===minCost?' &#9733;':''}</td>${d.fields.map(f=>`<td class="${d.agree[f]?'':'f'}">${r.values[f]==null?'':String(r.values[f])}</td>`).join('')}</tr>`;
+    h+=`<tr><td>${r.served}</td><td>${r.ms}ms${r.ms===minMs?' &#9733;':''}</td><td>$${r.cost}${r.cost===minCost?' &#9733;':''}</td>${d.fields.map(f=>`<td class="${d.agree[f]?'':'f'}"${d.agree[f]?'>':' title="disagreement">⚑ '}${r.values[f]==null?'':String(r.values[f])}</td>`).join('')}</tr>`;
   });
   h+='</table></div>';
   $('out').innerHTML=h;

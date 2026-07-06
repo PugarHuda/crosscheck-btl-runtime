@@ -80,6 +80,16 @@ class GatewayError(Exception):
         return self.status >= 500 or self.status == 429
 
 
+def _content(payload):
+    """Message content from a chat completion, or fail over on a malformed 200
+    body (empty choices / an {"error": ...} object) instead of crashing — a 200
+    with a bad body would otherwise escape chat()'s failover and kill the run."""
+    try:
+        return payload["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        raise GatewayError(502, "malformed response body: " + json.dumps(payload)[:200])
+
+
 def _http_chat(model, messages, temperature=0, response_json=True):
     """Low-level POST /v1/chat/completions. Raises GatewayError on failure."""
     body = {"model": model, "messages": messages, "temperature": temperature}
@@ -103,7 +113,7 @@ def _http_chat(model, messages, temperature=0, response_json=True):
         # dropped connection / IncompleteRead / timeout -> retryable, fail over
         raise GatewayError(599, str(e))
     _record_cost(hdrs)
-    return payload["choices"][0]["message"]["content"]
+    return _content(payload)
 
 
 def _timed_chat(model, prompt):
@@ -132,7 +142,7 @@ def _timed_chat(model, prompt):
             return 0.0
     return {"ms": ms, "charge": num("x-btl-customer-charge"),
             "saved": num("x-btl-saved"),
-            "content": payload["choices"][0]["message"]["content"][:60]}
+            "content": (_content(payload) or "")[:60]}
 
 
 def cache_demo(model=None, nonce=None):
@@ -771,6 +781,19 @@ def demo():
     assert d["servedA"] == d["servedB"] == MODEL_B
     assert all(d["fields"][f]["needs_review"] for f in ("x", "y"))
 
+    # a 200 with a malformed body (empty choices / error object) must fail over,
+    # not crash outside chat()'s GatewayError handling.
+    for bad in ({"choices": []}, {"error": {"message": "overloaded"}}, {}):
+        try:
+            _content(bad)
+            assert False, "malformed body should raise GatewayError"
+        except GatewayError as e:
+            assert e.status == 502 and e.retryable
+    served, content = chat(MODEL_A, [{"role": "user", "content": "hi"}], fallback=MODEL_B,
+                           chat_fn=lambda m, ms: _content({"choices": []}) if m == MODEL_A
+                           else '{"x":"ok"}')
+    assert served == MODEL_B and json.loads(content)["x"] == "ok"
+
     # judge unavailable (every model errors) -> defaults to candidate A, no crash.
     def alldown(model, messages):
         raise GatewayError(500, "everything down")
@@ -792,8 +815,8 @@ def demo():
     # "1200.0"); the judge resolves these numeric-format disagreements.
     assert norm("1200.00") != norm(1200.00)
 
-    print("self-check OK: agreement, judge, 5xx failover, 4xx raises, degraded mode, "
-          "judge-unavailable, parse_json, norm")
+    print("self-check OK: agreement, judge, 5xx failover, 4xx raises, malformed-body "
+          "failover, degraded mode, judge-unavailable, parse_json, norm")
 
 
 if __name__ == "__main__":

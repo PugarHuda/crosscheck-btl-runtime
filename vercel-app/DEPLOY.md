@@ -4,8 +4,11 @@ Live at **https://crosscheck-btl.vercel.app** — the landing page at `/`, the
 interactive dashboard at `/app`, and Python serverless functions at `/api/*`, all in
 one project. The API key is a Vercel env secret (never sent to the browser).
 
-`api/*.py` are self-contained Vercel Python functions (`/api/health`, `/api/samples`,
-`/api/extract`, `/api/cache-demo`, `/api/benchmark`). They import `crosscheck.py` and
+`api/*.py` are self-contained Vercel Python functions — one per mode: `/api/health`,
+`/api/models`, `/api/samples`, `/api/extract`, `/api/verify`, `/api/batch`,
+`/api/consensus`, `/api/consistency`, `/api/compare`, `/api/suggest`,
+`/api/benchmark`, `/api/cache-demo`. Each is a thin wrapper over one `cc.api_*`
+function (single source of truth). They import `crosscheck.py` and
 read `samples.json` / `demo_snapshot.json`, bundled via `vercel.json` (`includeFiles`).
 `index.html` is the landing (`web/index.html`); `app.html` is `server.py`'s `PAGE`
 (the dashboard), served at `/app` via `cleanUrls`.
