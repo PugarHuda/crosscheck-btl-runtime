@@ -15,6 +15,11 @@ read `samples.json` / `demo_snapshot.json`, bundled via `vercel.json` (`includeF
 
 ## Redeploy from the repo root
 
+**Easy path:** `bash deploy.sh` (assembles `.deploy/`, regenerates `app.html`,
+verifies all 12 endpoints are wired, then ships). `bash deploy.sh --dry` to
+build + verify without deploying. First time only, set the key once:
+`cd .deploy && vercel env add BTL_API_KEY production`. The manual equivalent:
+
 ```bash
 # assemble the deploy dir from the repo (no duplicated source)
 mkdir -p .deploy/api
