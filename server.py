@@ -406,11 +406,12 @@ function runConsistency(){
 function renderConsistency(d){
   if(d.error){$('out').innerHTML=`<div class="banner warn">${d.error}</div>`;return;}
   let h=`<div class=summary><span>${d.model} &middot; ${d.runs} runs &middot; ${d.ms}ms &middot; $${d.cost_usd} &middot; stability = how often the same value repeats</span></div>`;
-  for(const f in d.fields){const x=d.fields[f];const ok=x.stability>=0.6;const pct=Math.round(x.stability*100);
+  for(const f in d.fields){const x=d.fields[f];const empty=(x.value==null||String(x.value).trim()==='');
+    const ok=x.stability>=0.6&&!empty;const pct=Math.round(x.stability*100);
     h+=`<div class="card ${ok?'ok':'flag'}">
-      <div class=k>${f}<span class="badge ${ok?'b-ok':'b-flag'}">${pct}% stable</span></div>
+      <div class=k>${f}<span class="badge ${ok?'b-ok':'b-flag'}">${empty?'not found':pct+'% stable'}</span></div>
       <div class=v>${fmt(x.value)}</div>
-      <div class=mini>${x.distinct} distinct value${x.distinct===1?'':'s'} across ${x.runs} runs</div>
+      <div class=mini>${empty?`no value in ${x.runs} runs`:`${x.distinct} distinct value${x.distinct===1?'':'s'} across ${x.runs} runs`}</div>
     </div>`;}
   $('out').innerHTML=h;
 }

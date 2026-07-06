@@ -35,11 +35,11 @@ of the BTL runtime.
 
 ## BTL runtime endpoints used
 - `POST /v1/chat/completions` — extraction (×2 providers) + judge, via `gpt-4.1-mini` (OpenAI route) and `gemma-3-4b-it` (OpenRouter route) — two different providers behind one gateway
-- `GET /v1/models` — verify ids **and power the dashboard's model picker**: cross-check *any two* of the gateway's providers, chosen live (the whole point of a multi-provider gateway)
+- `GET /v1/models` — verify ids **and power the dashboard's model picker**: cross-check any two of the gateway's models (a curated set), chosen live (the whole point of a multi-provider gateway)
 - **Savings headers** — `x-btl-customer-charge` / `x-btl-saved` / `x-btl-cache-tier` read off each response to show real per-run cost and cache savings
-- **Exact-cache demo** — the dashboard's "⚡ Demo exact cache" fires the same prompt twice; the second call is a cache hit (measured ~1.5–2.4× faster, `x-btl-saved` > 0) — a live proof of a BTL-flagship feature
+- **Exact-cache demo** — the dashboard's "Exact cache" mode fires the same prompt twice; the second call is a cache hit (measured ~1.5–2.4× faster, `x-btl-saved` > 0) — a live proof of a BTL-flagship feature
 - **Demo resilience** — the gateway is genuinely flaky (frequent 500s). `snapshot` captures real results; if a live call fails during a demo, the dashboard replays the captured real result with a clearly-labeled "↻ Replay" banner, so a live presentation can't die on a transient outage
-- **Model picker + N-model consensus** — cross-check *any two* of the gateway's providers, or add a third for a **majority vote**: per field you get `unanimous` / `majority` / `split` with every model's vote shown. The multi-provider gateway, made interactive (`/api/models`, `/api/consensus`)
+- **Model picker + N-model consensus** — cross-check any two of those models, or add a third for a **majority vote**: per field you get `unanimous` / `majority` / `split` with every model's vote shown. The multi-provider gateway, made interactive (`/api/models`, `/api/consensus`)
 - **Batch mode** — verify a whole dataset at once: paste JSONL records, get a table with flagged cells highlighted and the real per-run cost (`/api/batch`, or `cat records.jsonl | python crosscheck.py batch`)
 - **Provider compare** — run the same extraction across your chosen models and see each one's answer, real latency, and real cost side by side (fastest &amp; cheapest starred) to decide which provider to use (`/api/compare`)
 - **Suggest fields** — paste a document and let a model propose the fields worth extracting (snake_case), so you don't need to know the schema up front (`/api/suggest`)
@@ -98,7 +98,7 @@ keep when the two models differ in capability, so you can run the cheap one safe
 Pure stdlib `unittest` — no pytest, no pip.
 ```bash
 python test_crosscheck.py            # unit + integration (gateway mocked, no key needed)
-BTL_API_KEY=... python test_crosscheck.py   # also runs 3 live gateway tests
+BTL_API_KEY=... python test_crosscheck.py   # also runs 4 live gateway tests
 ```
 - **unit** — `norm`, `_parse_json`, `validate_extract`, `GatewayError.retryable`,
   failover (5xx fails over, 4xx raises), agreement / disagreement→judge / degraded,
