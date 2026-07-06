@@ -12,7 +12,7 @@ validate_extract = cc.validate_extract
 PORT = int(os.environ.get("PORT", "8000"))
 HERE = os.path.dirname(__file__)
 
-PAGE = """<!doctype html><html><head><meta charset=utf-8>
+PAGE = """<!doctype html><html lang=en><head><meta charset=utf-8>
 <title>Crosscheck · BTL Runtime</title><meta name=viewport content="width=device-width,initial-scale=1">
 <style>
 :root{color-scheme:light;
@@ -158,7 +158,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
       </div>
       <label id=simRow class=mini style="display:none;align-items:center;gap:6px;cursor:pointer;margin-bottom:8px"><input type=checkbox id=simOutage> &#9888; simulate primary-provider outage <span style="opacity:.7">— watch the real failover fire on demand</span></label>
       <div class=row><button id=run onclick=runMode()>Run Crosscheck</button><span id=status class=mini role=status aria-live=polite></span></div>
-      <div id=out></div>
+      <div id=out role=region aria-label="Results" aria-live=polite></div>
     </main>
   </div>
 </div>
