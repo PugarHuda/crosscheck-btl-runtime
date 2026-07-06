@@ -46,6 +46,8 @@ body{font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;background:var
 .dot{width:8px;height:8px;border-radius:50%;background:#b6bdc9;display:inline-block;margin-right:6px;vertical-align:middle}
 .dot.up{background:var(--good);box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 20%,transparent)}
 .dot.down{background:var(--flag);box-shadow:0 0 0 3px color-mix(in srgb,var(--flag) 20%,transparent)}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.empty{border:1px dashed var(--line2);border-radius:8px;padding:26px 18px;color:var(--muted);text-align:center;font-size:13px;margin-top:4px}
 .heroline{font-family:var(--mono);text-transform:uppercase;font-size:clamp(19px,3vw,27px);
   letter-spacing:-.01em;margin:0 0 6px;font-weight:600}
 .heroline em{font-family:var(--serif);font-style:italic;text-transform:none;font-weight:500;color:var(--accent)}
@@ -109,8 +111,9 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
         <svg class=mark viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x=2 y=2 width=6 height=6 /><rect x=16 y=2 width=6 height=6 /><rect x=9 y=9 width=6 height=6 /><rect x=2 y=16 width=6 height=6 /><rect x=16 y=16 width=6 height=6 /></svg>
         crosscheck.
       </div>
+      <nav aria-label="Sections">
       <div class=grp>Verify</div>
-      <button class=navitem data-m=verify onclick="selectMode('verify')">Cross-check</button>
+      <button class=navitem data-m=verify onclick="selectMode('verify')">Crosscheck</button>
       <button class=navitem data-m=deep onclick="selectMode('deep')">Deep verify</button>
       <div class=grp>Analyze</div>
       <button class=navitem data-m=compare onclick="selectMode('compare')">Compare models</button>
@@ -121,14 +124,15 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
       <button class=navitem data-m=benchmark onclick="selectMode('benchmark')">Benchmark</button>
       <button class=navitem data-m=cache onclick="selectMode('cache')">Exact cache</button>
       <button class=navitem data-m=api onclick="selectMode('api')">Use as API</button>
+      </nav>
       <div class=sidefoot>
-        <span id=health title="checking gateway&hellip;" aria-label="gateway status"><span class=dot id=dot aria-hidden=true></span>gateway</span>
+        <span id=health role=status aria-live=polite title="checking gateway&hellip;"><span class=dot id=dot aria-hidden=true></span>gateway<span class=sr id=healthsr> status: checking&hellip;</span></span>
         <a href="/">&#8592; landing</a>
         <a href="https://github.com/PugarHuda/crosscheck-btl-runtime">github &#8599;</a>
       </div>
     </aside>
     <main class=main>
-      <div class=modehead><h1 class=heroline id=mtitle>Cross-check</h1><p class=sub id=mdesc></p></div>
+      <div class=modehead><h1 class=heroline id=mtitle>Crosscheck</h1><p class=sub id=mdesc></p></div>
       <div id=secTextFields>
         <select id=sample aria-label="Choose a sample document"></select>
         <textarea id=text aria-label="Text to extract fields from" placeholder="Paste messy text&hellip;"></textarea>
@@ -151,7 +155,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
         <pre id=apiSnippet class=snippet></pre>
         <div class=row><button class=copy onclick=copyApi()>Copy</button></div>
       </div>
-      <div class=row><button id=run onclick=runMode()>Run cross-check</button><span id=status class=mini role=status aria-live=polite></span></div>
+      <div class=row><button id=run onclick=runMode()>Run Crosscheck</button><span id=status class=mini role=status aria-live=polite></span></div>
       <div id=out></div>
     </main>
   </div>
@@ -171,9 +175,9 @@ function dlCompare(){if(!LASTCOMPARE)return;const d=LASTCOMPARE;const rows=[['pr
   d.rows.forEach(r=>{if(r.error){rows.push([r.model,'','ERROR',...d.fields.map(()=>'')]);return;}rows.push([r.served,r.ms,r.cost,...d.fields.map(f=>r.values[f])]);});dl('compare.csv',csv(rows),'text/csv');}
 let MODE='verify';
 const MODES={
-  verify:{t:'Cross-check',d:'Two providers, same prompt. Agree = accept; disagree = the strong model judges it and flags it.',btn:'Run cross-check',run:run},
+  verify:{t:'Crosscheck',d:'Two providers, same prompt. Agree = accept; disagree = the strong model judges it and flags it.',btn:'Run Crosscheck',run:run},
   deep:{t:'Deep verify',d:'Combine cross-model consensus AND self-consistency into one high / medium / low verdict per field.',btn:'Deep verify',run:runVerify},
-  compare:{t:'Compare providers',d:'Run the same extraction across your models; compare each answer, latency and real cost.',btn:'Compare',run:runCompare},
+  compare:{t:'Compare models',d:'Run the same extraction across your models; compare each answer, latency and real cost.',btn:'Compare',run:runCompare},
   consistency:{t:'Self-consistency',d:'Run one model (Model A) five times and see how stable each field is.',btn:'Run 5×',run:runConsistency},
   batch:{t:'Batch',d:'Verify many records at once — one JSON object per line, like {"text": "...", "fields": ["..."]}.',btn:'Run batch',run:runBatch},
   benchmark:{t:'Benchmark',d:'Accuracy of each model vs Crosscheck, with the real gateway cost.',btn:'Run benchmark',run:bench},
@@ -190,14 +194,16 @@ function selectMode(m){
   $('secModels').style.display=s.includes('models')?'':'none';
   $('secBatch').style.display=s.includes('batch')?'':'none';
   $('secApi').style.display=s.includes('api')?'':'none';
-  $('out').innerHTML=''; $('status').textContent='';
+  $('out').innerHTML = m==='api' ? '' : `<div class=empty>Press <b>${md.btn}</b> — results appear here.</div>`;
+  $('status').textContent='';
   if(m==='api') genApi();
 }
 function runMode(){ MODES[MODE].run(); }
 fetch('/api/health').then(r=>r.json()).then(h=>{
   $('dot').className='dot '+(h.ok?'up':'down');
   $('health').title=h.ok?'gateway reachable':'gateway unavailable — demo replays captured results';
-}).catch(()=>{$('dot').className='dot down';});
+  $('healthsr').textContent=' status: '+(h.ok?'reachable':'unavailable, replaying captured results');
+}).catch(()=>{$('dot').className='dot down';$('health').title='gateway unreachable';$('healthsr').textContent=' status: unreachable';});
 fetch('/api/models').then(r=>r.json()).then(d=>{
   $('modelA').innerHTML=d.models.map(m=>`<option ${m===d.default_a?'selected':''}>${m}</option>`).join('');
   $('modelB').innerHTML=d.models.map(m=>`<option ${m===d.default_b?'selected':''}>${m}</option>`).join('');
@@ -263,7 +269,7 @@ function render(d){
   if(d.error){$('out').innerHTML=`<div class="banner warn">gateway error: ${d.error}</div>`;return;}
   LAST=d;
   if(d.replay) h+=`<div class="banner warn">↻ Replay — the gateway was unavailable, so this is a previously captured real result.</div>`;
-  if(d.degraded) h+=`<div class="banner warn">⚠ Degraded: both requests served by <b>${d.servedA}</b> — the other provider failed over. Cross-check disabled, all fields flagged.</div>`;
+  if(d.degraded) h+=`<div class="banner warn">⚠ Degraded: both requests served by <b>${d.servedA}</b> — the other provider failed over. Crosscheck disabled, all fields flagged.</div>`;
   else if(d.failover) h+=`<div class="banner warn">↺ Failover: a provider errored, so the request was served by ${d.servedA} + ${d.servedB}.</div>`;
   const keys=Object.keys(d.fields), flagged=keys.filter(f=>d.fields[f].needs_review).length;
   h+=`<div class=summary>
