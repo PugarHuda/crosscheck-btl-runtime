@@ -320,6 +320,10 @@ def consensus(text, fields, models, chat_fn=None, judge_model=None):
         tally = Counter(norm(v) for v in votes.values())
         top_norm, count = tally.most_common(1)[0]
         top_val = next(v for v in votes.values() if norm(v) == top_norm)
+        if norm(top_val) == "":                # the plurality produced no value —
+            out[f] = {"value": top_val, "needs_review": True,   # not agreement, a
+                      "agreement": "not found", "votes": votes}  # shared miss
+            continue
         if count == len(votes) and len(live) == n:
             out[f] = {"value": top_val, "needs_review": False,
                       "agreement": "unanimous", "votes": votes}
@@ -410,7 +414,9 @@ def deepverify(text, fields, models, n=3, chat_fn=None):
     for f in fields:
         c, s = cons["fields"][f], stab["fields"][f]
         cross_ok = c["agreement"] == "unanimous"
-        if cross_ok and s["stability"] >= 0.8:
+        if norm(c["value"]) == "":          # nobody reliably produced the field —
+            conf = "low"                    # a consistent null is not high confidence
+        elif cross_ok and s["stability"] >= 0.8:
             conf = "high"
         elif c["agreement"] == "split" or s["stability"] < 0.5:
             conf = "low"
@@ -895,6 +901,14 @@ def demo():
     # C3: duplicate model ids are rejected for consensus and compare.
     dup = {"text": "x", "fields": ["y"], "models": ["m1", "m1"]}
     assert api_consensus(dup)[0] == 400 and api_compare(dup)[0] == 400
+
+    # a field NO model produces is not a confident null: consensus flags it
+    # "not found" and deep-verify rates it low, never high.
+    nf = consensus("x", ["missing"], [MODEL_A, MODEL_B], chat_fn=lambda m, ms: "{}")
+    assert nf["fields"]["missing"]["agreement"] == "not found"
+    assert nf["fields"]["missing"]["needs_review"] is True
+    dv = deepverify("x", ["missing"], [MODEL_A, MODEL_B], n=2, chat_fn=lambda m, ms: "{}")
+    assert dv["fields"]["missing"]["confidence"] == "low"
 
     print("self-check OK: agreement, judge, 5xx failover, 4xx raises, malformed-body "
           "failover, degraded mode, judge-unavailable, consensus isolation, "
