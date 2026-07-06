@@ -156,6 +156,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
         <pre id=apiSnippet class=snippet></pre>
         <div class=row><button class=copy onclick=copyApi()>Copy</button></div>
       </div>
+      <label id=simRow class=mini style="display:none;align-items:center;gap:6px;cursor:pointer;margin-bottom:8px"><input type=checkbox id=simOutage> &#9888; simulate primary-provider outage <span style="opacity:.7">— watch the real failover fire on demand</span></label>
       <div class=row><button id=run onclick=runMode()>Run Crosscheck</button><span id=status class=mini role=status aria-live=polite></span></div>
       <div id=out></div>
     </main>
@@ -195,6 +196,8 @@ function selectMode(m){
   $('secModels').style.display=s.includes('models')?'':'none';
   $('secBatch').style.display=s.includes('batch')?'':'none';
   $('secApi').style.display=s.includes('api')?'':'none';
+  $('simRow').style.display = m==='verify' ? 'inline-flex' : 'none';
+  if(m!=='verify') $('simOutage').checked=false;
   $('out').innerHTML = m==='api' ? '' : `<div class=empty>Press <b>${md.btn}</b> — results appear here.</div>`;
   $('status').textContent='';
   if(m==='api') genApi();
@@ -243,6 +246,7 @@ function run(){
     return;
   }
   const body={text,fields}; if(mA&&mB) body.models=[mA,mB];
+  if($('simOutage').checked) body.simulate_outage=true;
   setBusy(true,'calling two providers…');
   fetch('/api/extract',{method:'POST',body:JSON.stringify(body)})
    .then(r=>r.json()).then(d=>{setBusy(false);render(d);}).catch(err);

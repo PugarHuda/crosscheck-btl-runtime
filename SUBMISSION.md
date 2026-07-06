@@ -20,7 +20,9 @@ registered email any time before then — last saved version is judged.
 **Live app link:** https://crosscheck-btl.vercel.app  *(landing page; the interactive dashboard is at /app — Vercel Python serverless, API key stored as a server-side env secret, never exposed to the browser; falls back to a labeled replay of real captured results when the gateway 500s)*
 **Demo video link:** <paste after recording — script in section 2>
 **Runtime proof / request ID:**
-> Live gpt-4.1-mini call through the gateway — response id `chatcmpl_aae78595af5147369f9a6cb7a03b477d`, x-railway-request-id `7QGwTJoaTAWqLvVto3UVLg`, x-hikari-trace `sin1.tr00`, x-btl-customer-charge `0.000008`. Reproducible: `BTL_API_KEY=... python crosscheck.py bench` prints live cost read from the gateway's own headers.
+> Live gpt-4.1-mini call through the gateway — response id `chatcmpl_aae78595af5147369f9a6cb7a03b477d`, x-railway-request-id `7QGwTJoaTAWqLvVto3UVLg`, x-hikari-trace `sin1.tr00`, x-btl-customer-charge `0.000008`.
+> Fresh live capture (2026-07-06, through the deployed app): `POST /api/extract` on "3 cartons, 12 bottles per carton" caught the cheap model's `12`, judge resolved to `36`, x-btl-customer-charge `$0.000219`. `POST /api/cache-demo`: same prompt twice → 883 ms cold vs 78 ms warm (11.3× faster), x-btl-saved `$0.000008`. Every cost/saved figure is read live from the gateway's own response headers.
+> Reproducible: `BTL_API_KEY=... python crosscheck.py bench` (or `cache`) prints the live cost from those headers.
 **Social post link:** <optional, up to 3 bonus pts — draft in section 4>
 
 **Short description (paste this):**
@@ -45,8 +47,8 @@ Total ~115s. Record at 1080p, browser zoomed so text is readable. Speak calmly.
 *(cards appear — total_bottles is red)*
 > "The cheap model answered twelve — it grabbed the wrong number. The strong model said thirty-six. They disagree, so Crosscheck flags it red and the judge resolves it to the correct answer, thirty-six. The cheap model's silent error just got caught and fixed automatically."
 
-**[0:55–1:15] Failover** *(if a 500 happens naturally, point at the banner; otherwise say this over a normal run)*
-> "The gateway sometimes returns a 500. Instead of crashing, Crosscheck fails over to the other provider automatically — you see the failover banner here. Resilience is built in, which matters on real infrastructure."
+**[0:55–1:15] Failover** *(tick the "simulate primary-provider outage" box, then Run — the failover fires on demand)*
+> "Real gateways go down. Let me prove Crosscheck handles it — I'll flip this switch to knock out the primary provider mid-run. Instead of crashing, it fails over to the other provider automatically and tells you cross-checking is degraded, so nothing silently slips through. Resilience is built in, and I can trigger it live — no waiting for a random outage."
 
 **[1:15–1:45] The numbers** *(pick "Benchmark" in the sidebar → stats appear)*
 > "The cheap model alone scores about ninety percent. Crosscheck lifts it toward the strong model — around ninety-three to ninety-four — by catching and fixing its silent errors. Both models run on every field, so this is a verification layer, not a cost trick — but the judge only fires on the ten percent that disagree. And here's the whole run's cost, read live from the gateway's own charge header: about four tenths of a cent. Every flag is a real discrepancy — a hundred percent precision — and I report the blind spot honestly: when both models make the same mistake, cross-checking can't see it."
@@ -77,14 +79,14 @@ Posting publicly is optional but judges can award up to 3 points. Paste the post
 in the form's "Social post link" field. Draft below — tweak in your own voice, tag
 **@Badtheorylabs**.
 
-**Single post (X / LinkedIn):**
+**Single post (X / LinkedIn) — ready to paste:**
 > Built Crosscheck for the @Badtheorylabs Runtime hackathon 🔀
 >
 > LLMs fail silently — a cheap model returns a confident wrong value and you never know. So I run it *and* a strong model on the same prompt through BTL's multi-provider gateway. Agree → accept. Disagree → the strong model judges it and flags it.
 >
-> On a 68-field benchmark it caught + fixed the cheap model's silent errors (e.g. "3×12 bottles → 12" became 36), 100% flag precision, and I read the real cost straight off the gateway's x-btl-customer-charge header (~$0.004/run). Plus cross-provider failover when a route 500s.
+> On a 68-field benchmark it caught + fixed the cheap model's silent errors ("3×12 bottles → 12" became 36), 100% flag precision, real cost read straight off the gateway's x-btl-customer-charge header (~$0.004/run). Flip one switch in the dashboard and watch it fail over live when a provider 500s.
 >
-> Honest part: it's a verification layer, not a cost trick — both models run. Code + tests: github.com/PugarHuda/crosscheck-btl-runtime
+> Honest part: it's a verification layer, not a cost trick — both models run. Live: crosscheck-btl.vercel.app · Code: github.com/PugarHuda/crosscheck-btl-runtime
 
 **If you post a thread**, split into: (1) the problem + hook, (2) the 12→36 catch with a
 screenshot of the dashboard/showcase, (3) the numbers + cost header, (4) repo link.

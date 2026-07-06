@@ -601,10 +601,20 @@ def api_extract(req):
     if models is not None and (not isinstance(models, list) or len(models) != 2
             or not all(isinstance(x, str) and x.strip() for x in models)):
         return 400, {"error": "field 'models' must be [modelA, modelB]"}
+    # demo control: force the primary provider to 5xx so a judge can watch the
+    # real failover path fire on-demand instead of waiting for a random outage.
+    cf = None
+    if req.get("simulate_outage"):
+        down = tuple(models)[0] if models else MODEL_A
+
+        def cf(model, messages, _down=down):
+            if model == _down:
+                raise GatewayError(503, "simulated primary-provider outage (demo)")
+            return _http_chat(model, messages)
     try:
         reset_cost()
         t0 = time.time()
-        r = crosscheck(req["text"], req["fields"],
+        r = crosscheck(req["text"], req["fields"], chat_fn=cf,
                        models=tuple(models) if models else None)
         r["cost_usd"] = round(get_cost()["charge"], 6)
         r["ms"] = round((time.time() - t0) * 1000)
