@@ -23,19 +23,20 @@ PAGE = """<!doctype html><html><head><meta charset=utf-8>
 *{box-sizing:border-box}
 body{font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--paper);
   color:var(--text);margin:0;padding:0}
-.frame{background:var(--paper);overflow:hidden}
+.frame{background:var(--paper)}
 .app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
 @media (max-width:760px){.app{grid-template-columns:1fr}}
 .side{border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:2px;
   position:sticky;top:0;height:100vh;align-self:start;overflow-y:auto;background:var(--paper)}
 @media (max-width:760px){.side{border-right:0;border-bottom:1px solid var(--line);position:static;height:auto}}
+.side nav{display:flex;flex-direction:column;gap:2px}
 .side .brand{padding:4px 8px 10px}
 .side .grp{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:13px 8px 3px}
 .navitem{display:block;width:100%;text-align:left;background:none;border:0;border-radius:7px;padding:8px 10px;
   font:inherit;font-size:13px;color:var(--text);cursor:pointer;margin:0}
 .navitem:hover{background:var(--wash)}
 .navitem.on{background:var(--ink);color:#fff}
-.sidefoot{margin-top:auto;padding:14px 8px 4px;border-top:1px solid var(--line);margin-top:16px;
+.sidefoot{margin-top:auto;padding:16px 8px 4px;border-top:1px solid var(--line);
   font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:7px}
 .sidefoot a{color:var(--muted);text-decoration:none}
 .sidefoot a:hover{color:var(--text)}
@@ -144,7 +145,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
       </div>
       <div id=secModels class=modelrow>
         <label>Model A (reference) <select id=modelA aria-label="Model A"></select></label>
-        <label>Model B (cross-check) <select id=modelB aria-label="Model B"></select></label>
+        <label>Model B (candidate) <select id=modelB aria-label="Model B"></select></label>
         <label>Model C (optional) <select id=modelC aria-label="Model C (optional)"></select></label>
       </div>
       <div id=secBatch style="display:none">
@@ -182,7 +183,7 @@ const MODES={
   batch:{t:'Batch',d:'Verify many records at once — one JSON object per line, like {"text": "...", "fields": ["..."]}.',btn:'Run batch',run:runBatch},
   benchmark:{t:'Benchmark',d:'Accuracy of each model vs Crosscheck, with the real gateway cost.',btn:'Run benchmark',run:bench},
   cache:{t:'Exact cache',d:'Fire the same prompt twice; the second call is served from the gateway cache — faster and cheaper.',btn:'Demo cache',run:cacheDemo},
-  api:{t:'Use as an API',d:'Crosscheck is a callable verified-extraction API. Copy the request below.',btn:'Refresh snippet',run:genApi}
+  api:{t:'Use as API',d:'Crosscheck is a callable verified-extraction API. Copy the request below.',btn:'Refresh snippet',run:genApi}
 };
 const SEC={verify:['tf','models'],deep:['tf','models'],compare:['tf','models'],consistency:['tf','models'],batch:['models','batch'],benchmark:[],cache:[],api:['tf','models','api']};
 function selectMode(m){
