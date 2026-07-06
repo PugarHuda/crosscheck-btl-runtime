@@ -274,7 +274,12 @@ def crosscheck(text, fields, chat_fn=None, models=None, judge_model=None):
     out = {}
     for f in fields:
         a, b = ra.get(f), rb.get(f)
-        if not degraded and norm(a) == norm(b):
+        # both-empty is NOT real agreement: neither model produced the requested
+        # field, so route it to the judge (which gets a fresh shot at extracting
+        # it) and flag it — rather than returning a confident null. Otherwise a
+        # shared blind spot on a requested field is presented as consensus.
+        both_empty = norm(a) == "" and norm(b) == ""
+        if not degraded and not both_empty and norm(a) == norm(b):
             out[f] = {"value": a, "agree": True, "needs_review": False,
                       "a": a, "b": b, "reason": ""}
         else:
@@ -615,6 +620,8 @@ def api_consensus(req):
     if (not isinstance(models, list) or not (2 <= len(models) <= 4)
             or not all(isinstance(x, str) and x.strip() for x in models)):
         return 400, {"error": "field 'models' must be a list of 2-4 model ids"}
+    if len(set(models)) != len(models):
+        return 400, {"error": "models must be distinct — pick different providers"}
     try:
         reset_cost()
         t0 = time.time()
@@ -636,6 +643,8 @@ def api_verify(req):
     if (not isinstance(models, list) or not (2 <= len(models) <= 4)
             or not all(isinstance(x, str) and x.strip() for x in models)):
         return 400, {"error": "field 'models' must be a list of 2-4 model ids"}
+    if len(set(models)) != len(models):
+        return 400, {"error": "models must be distinct — pick different providers"}
     try:
         reset_cost()
         t0 = time.time()
@@ -695,6 +704,8 @@ def api_compare(req):
     if (not isinstance(models, list) or not (2 <= len(models) <= 4)
             or not all(isinstance(x, str) and x.strip() for x in models)):
         return 400, {"error": "field 'models' must be a list of 2-4 model ids"}
+    if len(set(models)) != len(models):
+        return 400, {"error": "models must be distinct — pick different providers"}
     try:
         t0 = time.time()
         r = compare(req["text"], req["fields"], models)
@@ -876,9 +887,18 @@ def demo():
     assert cd["fields"]["x"]["agreement"] == "unavailable"
     assert all(v == "unavailable" for v in cd["served"].values())
 
+    # C2: both models empty on a requested field -> flagged (routed to the judge),
+    # not a silent "confident null" agreement.
+    be = crosscheck("no total in this text", ["total"], chat_fn=lambda m, ms: "{}")
+    assert be["fields"]["total"]["needs_review"] is True and be["fields"]["total"]["agree"] is False
+
+    # C3: duplicate model ids are rejected for consensus and compare.
+    dup = {"text": "x", "fields": ["y"], "models": ["m1", "m1"]}
+    assert api_consensus(dup)[0] == 400 and api_compare(dup)[0] == 400
+
     print("self-check OK: agreement, judge, 5xx failover, 4xx raises, malformed-body "
           "failover, degraded mode, judge-unavailable, consensus isolation, "
-          "parse_json, norm, input guards")
+          "both-null flag, distinct-models, parse_json, norm, input guards")
 
 
 if __name__ == "__main__":
