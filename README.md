@@ -37,8 +37,8 @@ of the BTL runtime.
 - `POST /v1/chat/completions` — extraction (×2 providers) + judge, via `gpt-4.1-mini` (OpenAI route) and `gemma-3-4b-it` (OpenRouter route) — two different providers behind one gateway
 - `GET /v1/models` — verify ids **and power the dashboard's model picker**: cross-check any two of the gateway's models (a curated set), chosen live (the whole point of a multi-provider gateway)
 - **Savings headers** — `x-btl-customer-charge` / `x-btl-saved` / `x-btl-cache-tier` read off each response to show real per-run cost and cache savings
-- **Exact-cache demo** — the dashboard's "Exact cache" mode fires the same prompt twice; the second call is a cache hit (measured ~1.5–2.4× faster, `x-btl-saved` > 0) — a live proof of a BTL-flagship feature
-- **Demo resilience** — the gateway is genuinely flaky (frequent 500s). `snapshot` captures real results; if a live call fails during a demo, the dashboard replays the captured real result with a clearly-labeled "↻ Replay" banner, so a live presentation can't die on a transient outage
+- **Exact-cache demo** — the dashboard's "Exact cache" mode fires the same prompt twice; the second call is a cache hit (measured **~8–12× faster**, `x-btl-saved` > 0) — a live proof of a BTL-flagship feature
+- **Demo resilience** — the gateway is genuinely flaky (frequent 500s). `snapshot` captures real results; if a live call fails during a demo, the dashboard replays the captured real result with a clearly-labeled "↻ Replay" banner, so a live presentation can't die on a transient outage. A labeled **"simulate primary-provider outage"** toggle also fires the *real* failover path on demand — you can prove resilience live instead of waiting for a random 500
 - **Model picker + N-model consensus** — cross-check any two of those models, or add a third for a **majority vote**: per field you get `unanimous` / `majority` / `split` with every model's vote shown. The multi-provider gateway, made interactive (`/api/models`, `/api/consensus`)
 - **Batch mode** — verify a whole dataset at once: paste JSONL records, get a table with flagged cells highlighted and the real per-run cost (`/api/batch`, or `cat records.jsonl | python crosscheck.py batch`)
 - **Provider compare** — run the same extraction across your chosen models and see each one's answer, real latency, and real cost side by side (fastest &amp; cheapest starred) to decide which provider to use (`/api/compare`)
@@ -101,8 +101,10 @@ python test_crosscheck.py            # unit + integration (gateway mocked, no ke
 BTL_API_KEY=... python test_crosscheck.py   # also runs 4 live gateway tests
 ```
 - **unit** — `norm`, `_parse_json`, `validate_extract`, `GatewayError.retryable`,
-  failover (5xx fails over, 4xx raises), agreement / disagreement→judge / degraded,
-  judge-unavailable, benchmark scoring.
+  failover (5xx fails over, 4xx raises, malformed 200 body fails over), agreement /
+  disagreement→judge / degraded, judge-unavailable, consensus per-model isolation,
+  both-null flagged (not confident-null), distinct-model + non-object-body guards,
+  benchmark scoring.
 - **integration** — the real HTTP server driven over a socket with the gateway
   mocked: routing, input validation (400s), JSON serialization, 404s, `/api/benchmark`.
 - **live** — real gateway; a persistent 5xx *skips* (the gateway is genuinely flaky),
@@ -111,7 +113,10 @@ BTL_API_KEY=... python test_crosscheck.py   # also runs 4 live gateway tests
 `python crosscheck.py` and `python server.py test` also run quick embedded self-checks.
 
 ## Files
-- `crosscheck.py` — core (gateway client + failover, fan-out, judge, benchmark, self-check)
-- `server.py` — dashboard (stdlib http.server) + input validation
-- `samples.json` — labeled extraction benchmark
-- `test_crosscheck.py` — unit + integration + live test suite
+- `crosscheck.py` — core (gateway client + failover, fan-out, judge, consensus, deep-verify, benchmark, self-check) and the shared `api_*` handlers
+- `server.py` — dashboard (stdlib http.server) + input validation; the dashboard HTML is its `PAGE` constant
+- `samples.json` — labeled extraction benchmark; `demo_snapshot.json` — captured real results for the offline replay
+- `test_crosscheck.py` — unit + integration + live test suite (78 tests)
+- `web/` — landing page + custom 404; `vercel-app/` — serverless functions (thin wrappers over `crosscheck.py`) + `vercel.json`
+- `deploy.sh` — one-command Vercel deploy (assembles the build, verifies all 12 endpoints wired, ships); notes in `vercel-app/DEPLOY.md`
+- `showcase.html` — standalone static visual of the catch, for sharing
