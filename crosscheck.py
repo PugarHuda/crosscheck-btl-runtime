@@ -8,7 +8,7 @@ adjudicated by a judge pass and flagged for human review. If one provider
 Pure stdlib. No pip install. Run `python crosscheck.py` for the offline
 self-check (no API key needed).
 """
-import os, re, json, socket, time, http.client, threading
+import os, re, json, socket, time, http.client, threading, functools
 import urllib.request, urllib.error
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
@@ -50,6 +50,23 @@ def reset_cost():
 def get_cost():
     with _cost_lock:
         return dict(_cost)
+
+
+_run_lock = threading.Lock()
+
+
+def _cost_serialized(fn):
+    """Serialize a handler's reset->work->read cost window. The cost meter is a
+    module global and the local server is threaded (ThreadingTCPServer), so two
+    overlapping cost-bearing requests would otherwise zero each other's total mid-
+    flight. ponytail: one global lock — invisible for a single-user demo; thread a
+    per-request cost object if you ever need concurrent extractions. (Vercel is
+    already safe: each function invocation is its own process.)"""
+    @functools.wraps(fn)
+    def wrap(*a, **k):
+        with _run_lock:
+            return fn(*a, **k)
+    return wrap
 
 
 def _record_cost(headers):
@@ -272,31 +289,47 @@ def crosscheck(text, fields, chat_fn=None, models=None, judge_model=None):
 def consensus(text, fields, models, chat_fn=None, judge_model=None):
     """N-model majority vote (N>=2). Per field: unanimous -> accept; a majority
     -> accept the majority value but flag the dissent; no majority -> flag as a
-    split for a human. Each model's vote is returned for transparency."""
+    split for a human. Each model's vote is returned for transparency. A model
+    whose primary AND fallback are both down is dropped from the vote (reported as
+    unavailable) instead of sinking the whole request — like compare()/batch()."""
     chat_fn = chat_fn or _http_chat
     n = len(models)
     with ThreadPoolExecutor(max_workers=min(n, 8)) as ex:
         futs = {i: ex.submit(extract, m, models[(i + 1) % n], text, fields, chat_fn)
                 for i, m in enumerate(models)}
-        served = {i: futs[i].result() for i in futs}   # i -> (served_model, result)
+        served = {}
+        for i in futs:
+            try:
+                served[i] = futs[i].result()   # i -> (served_model, result)
+            except GatewayError:
+                served[i] = None               # this model and its fallback are down
+    live = [i for i in range(n) if served[i] is not None]
 
     out = {}
     for f in fields:
-        votes = {models[i]: served[i][1].get(f) for i in range(n)}
+        votes = {models[i]: served[i][1].get(f) for i in live}
+        if not votes:                          # every model down
+            out[f] = {"value": None, "needs_review": True,
+                      "agreement": "unavailable", "votes": {}}
+            continue
         tally = Counter(norm(v) for v in votes.values())
         top_norm, count = tally.most_common(1)[0]
         top_val = next(v for v in votes.values() if norm(v) == top_norm)
-        if count == n:
+        if count == len(votes) and len(live) == n:
             out[f] = {"value": top_val, "needs_review": False,
                       "agreement": "unanimous", "votes": votes}
-        elif count > n / 2:
+        elif count == len(votes):              # unanimous among the models we could reach
+            out[f] = {"value": top_val, "needs_review": True,
+                      "agreement": "unanimous (of available)", "votes": votes}
+        elif count > len(votes) / 2:
             out[f] = {"value": top_val, "needs_review": True,
                       "agreement": "majority", "votes": votes}
         else:
             out[f] = {"value": top_val, "needs_review": True,
                       "agreement": "split", "votes": votes}
     return {"fields": out, "models": models,
-            "served": {models[i]: served[i][0] for i in range(n)}}
+            "served": {models[i]: (served[i][0] if served[i] else "unavailable")
+                       for i in range(n)}}
 
 
 def compare(text, fields, models, chat_fn=None):
@@ -546,6 +579,7 @@ def api_models():
             "default_a": MODEL_A, "default_b": MODEL_B}
 
 
+@_cost_serialized
 def api_extract(req):
     """(status, body) — validate, run, attach cost/latency, replay on outage.
     Optional req['models'] = [modelA, modelB] picks the two providers to cross-check."""
@@ -571,6 +605,7 @@ def api_extract(req):
         return 502, {"error": str(e)}
 
 
+@_cost_serialized
 def api_consensus(req):
     """(status, body) — N-model majority vote. req['models'] = 2-4 model ids."""
     err = validate_extract(req)
@@ -591,6 +626,7 @@ def api_consensus(req):
         return 502, {"error": str(e)}
 
 
+@_cost_serialized
 def api_verify(req):
     """(status, body) — deep verify: cross-model + self-consistency -> one verdict."""
     err = validate_extract(req)
@@ -611,6 +647,7 @@ def api_verify(req):
         return 502, {"error": str(e)}
 
 
+@_cost_serialized
 def api_consistency(req):
     """(status, body) — run one model req['n'] (2-8) times; per-field stability."""
     err = validate_extract(req)
@@ -648,6 +685,7 @@ def api_suggest(req):
         return 502, {"error": str(e)}
 
 
+@_cost_serialized
 def api_compare(req):
     """(status, body) — run the same extraction across 2-4 models; per-model metrics."""
     err = validate_extract(req)
@@ -666,6 +704,7 @@ def api_compare(req):
         return 502, {"error": str(e)}
 
 
+@_cost_serialized
 def api_batch(req):
     """(status, body) — verify up to 12 {text, fields} records at once."""
     if not isinstance(req, dict):
@@ -698,6 +737,7 @@ def api_batch(req):
         return 502, {"error": str(e)}
 
 
+@_cost_serialized
 def api_benchmark(partial=False):
     """Snapshot if captured; else run the full set (local) or a representative
     easy+hard subset (partial, for the serverless time limit)."""
@@ -827,8 +867,18 @@ def demo():
     for bad in (None, [1, 2], "x", 5):
         assert api_suggest(bad)[0] == 400 and api_batch(bad)[0] == 400
 
+    # consensus happy path, then per-model failure isolation: a model whose
+    # primary AND fallback are both down is dropped, not fatal to the request.
+    cg = consensus("t", ["x", "y"], [MODEL_A, MODEL_B],
+                   chat_fn=lambda m, ms: '{"x": "1", "y": "2"}')
+    assert cg["fields"]["x"]["agreement"] == "unanimous"
+    cd = consensus("t", ["x"], [MODEL_A, MODEL_B, "m3"], chat_fn=alldown)
+    assert cd["fields"]["x"]["agreement"] == "unavailable"
+    assert all(v == "unavailable" for v in cd["served"].values())
+
     print("self-check OK: agreement, judge, 5xx failover, 4xx raises, malformed-body "
-          "failover, degraded mode, judge-unavailable, parse_json, norm, input guards")
+          "failover, degraded mode, judge-unavailable, consensus isolation, "
+          "parse_json, norm, input guards")
 
 
 if __name__ == "__main__":
