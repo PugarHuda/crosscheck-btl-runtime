@@ -1,7 +1,7 @@
 # Crosscheck — a reliability layer on the BTL runtime
 
 [![tests](https://github.com/PugarHuda/crosscheck-btl-runtime/actions/workflows/test.yml/badge.svg)](https://github.com/PugarHuda/crosscheck-btl-runtime/actions/workflows/test.yml)
-&nbsp;·&nbsp; [MIT](LICENSE) &nbsp;·&nbsp; [Live site](https://crosscheck-btl.vercel.app) &nbsp;·&nbsp; pure Python stdlib &nbsp;·&nbsp; 51 tests
+&nbsp;·&nbsp; [MIT](LICENSE) &nbsp;·&nbsp; [Live site](https://crosscheck-btl.vercel.app) &nbsp;·&nbsp; pure Python stdlib &nbsp;·&nbsp; 78 tests
 
 **Live:** https://crosscheck-btl.vercel.app — landing page, with the interactive dashboard at **[/app](https://crosscheck-btl.vercel.app/app)** (Vercel serverless, API key as a server-side secret). Run locally with `python server.py`. Deploy notes: [`vercel-app/DEPLOY.md`](vercel-app/DEPLOY.md).
 

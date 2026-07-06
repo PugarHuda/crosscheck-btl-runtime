@@ -635,9 +635,13 @@ def api_consistency(req):
 
 def api_suggest(req):
     """(status, body) — propose extraction fields for req['text']."""
+    if not isinstance(req, dict):
+        return 400, {"error": "body must be a JSON object"}
     text = req.get("text")
     if not isinstance(text, str) or not text.strip():
         return 400, {"error": "field 'text' must be a non-empty string"}
+    if len(text) > 20000:
+        return 400, {"error": "field 'text' too long (max 20000 chars)"}
     try:
         return 200, {"fields": suggest_fields(text)}
     except Exception as e:
@@ -664,6 +668,8 @@ def api_compare(req):
 
 def api_batch(req):
     """(status, body) — verify up to 12 {text, fields} records at once."""
+    if not isinstance(req, dict):
+        return 400, {"error": "body must be a JSON object"}
     records = req.get("records")
     if not isinstance(records, list) or not records:
         return 400, {"error": "field 'records' must be a non-empty list"}
@@ -676,6 +682,8 @@ def api_batch(req):
         fs = list(fs.keys()) if isinstance(fs, dict) else fs
         if not isinstance(fs, list) or not fs:
             return 400, {"error": "each record needs a non-empty 'fields'"}
+        if len(rec["text"]) > 20000 or len(fs) > 40:
+            return 400, {"error": "a record exceeds the caps (text 20000 chars, 40 fields)"}
     models = req.get("models")
     if models is not None and (not isinstance(models, list) or len(models) != 2
             or not all(isinstance(x, str) and x.strip() for x in models)):
@@ -815,8 +823,12 @@ def demo():
     # "1200.0"); the judge resolves these numeric-format disagreements.
     assert norm("1200.00") != norm(1200.00)
 
+    # suggest/batch must 400 (not crash) on a valid-JSON-but-non-object body
+    for bad in (None, [1, 2], "x", 5):
+        assert api_suggest(bad)[0] == 400 and api_batch(bad)[0] == 400
+
     print("self-check OK: agreement, judge, 5xx failover, 4xx raises, malformed-body "
-          "failover, degraded mode, judge-unavailable, parse_json, norm")
+          "failover, degraded mode, judge-unavailable, parse_json, norm, input guards")
 
 
 if __name__ == "__main__":

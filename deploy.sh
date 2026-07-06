@@ -10,6 +10,7 @@ rm -rf .deploy && mkdir -p .deploy/api
 cp vercel-app/api/*.py .deploy/api/
 cp vercel-app/vercel.json crosscheck.py samples.json demo_snapshot.json .deploy/
 cp web/index.html .deploy/index.html
+cp web/404.html .deploy/404.html
 python -c "import server; open('.deploy/app.html','w',encoding='utf-8').write(server.PAGE)"
 
 # sanity: the built dashboard must carry all 12 endpoints, or a mode 404s live
